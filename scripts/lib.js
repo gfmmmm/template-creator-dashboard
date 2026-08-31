@@ -19,18 +19,24 @@ const THUMBS = path.join(DATA_DIR, 'thumbs');
 const THUMB_WEB = 'data/thumbs';
 
 // ───────────────── .env 파서 (dotenv 없이 10줄) ─────────────────
+// 파일 내용 → 객체. 파일을 읽는 일과 분리해둔 건 테스트에서 가짜 문자열을 넣어보기 위해서다.
+function parseEnv(text) {
+  const out = {};
+  for (const line of String(text || '').split('\n')) {
+    if (line.trim().startsWith('#')) continue;
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+  return out;
+}
+
 // GitHub Actions 는 시크릿을 process.env 로 주므로 그쪽이 우선이고,
 // 로컬에서는 .env 파일이 유일한 출처다.
 function loadEnv() {
-  const env = { ...process.env };
-  try {
-    for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split('\n')) {
-      if (line.trim().startsWith('#')) continue;
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-      if (m && !env[m[1]]) env[m[1]] = m[2].replace(/^["']|["']$/g, '');
-    }
-  } catch { /* .env 가 없으면 process.env 만 쓴다 */ }
-  return env;
+  let file = {};
+  try { file = parseEnv(fs.readFileSync(path.join(ROOT, '.env'), 'utf8')); }
+  catch { /* .env 가 없으면 process.env 만 쓴다 */ }
+  return { ...file, ...process.env };
 }
 
 const log = (msg) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${msg}`);
@@ -64,6 +70,30 @@ function writeJson(name, obj) {
   const tmp = `${dest}.tmp${process.pid}`;
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
   fs.renameSync(tmp, dest);
+}
+
+// ───────────────── 더미(demo) 취급 ─────────────────
+// 템플릿에 들어 있는 예시 데이터에는 JSON 최상위에 demo:true 가 붙어 있다(sample/*/ 의 4개 파일).
+// 스크립트는 이걸 "실데이터 없음"과 똑같이 취급한다. 그래야 템플릿을 받은 사람이 첫 수집을 할 때
+//  · 가짜 팔로워 추이 14일치가 실계정 그래프에 이어 붙지 않고
+//  · 품질 게이트가 더미 릴스를 '기존'으로 착각해 정상 수집을 거부하지 않는다(릴스 몇 개뿐인 계정이 통째로 막힌다)
+//  · 예시 발굴·예시 코칭이 실계정 화면에 섞이지 않는다.
+const isDemo = (obj) => !!(obj && obj.demo);
+
+// demo 이거나 없으면 fallback 의 '사본'을 준다 — 사본이라야 호출부가 고쳐도 원본 상수가 오염되지 않는다.
+function freshIfDemo(obj, fallback) { return (!obj || isDemo(obj)) ? structuredClone(fallback) : obj; }
+
+// 더미 썸네일 일괄 삭제. 예시 썸네일은 SVG 로 그려 넣었고 실수집 썸네일은 전부 .jpg 라서 섞이지 않는다.
+// 지운 개수를 돌려준다.
+function clearDemoThumbs() {
+  let n = 0;
+  try {
+    for (const f of fs.readdirSync(THUMBS)) {
+      if (!f.endsWith('.svg')) continue;
+      try { fs.unlinkSync(path.join(THUMBS, f)); n++; } catch { /* 이미 없음 */ }
+    }
+  } catch { /* thumbs 폴더가 없으면 지울 것도 없다 */ }
+  return n;
 }
 
 // ───────────────── ScrapeCreators (수집 전부) ─────────────────
@@ -400,10 +430,43 @@ const median = (nums) => {
 const limitOf = (name, def) => (process.env[name] === undefined || process.env[name] === ''
   ? def : Math.max(0, Number(process.env[name]) || 0));
 
+// ───────────────── 봇 파일 공통 규칙 ─────────────────
+// 카드번호 부여 — 기존 번호는 절대 안 바뀌고, 새 항목만 오래된 순으로 이어 붙인다.
+// 번호를 재사용하면 "M-012 로 기획해줘"가 다른 영상을 가리키는 사고가 난다.
+// 돌려주는 next 는 '다음에 쓸 번호'.
+function assignCardNumbers(items, prefix, next, prevMap = {}) {
+  for (const it of items) if (!it.cardNo && prevMap[it.shortcode]) it.cardNo = prevMap[it.shortcode];
+  const fresh = items.filter((i) => !i.cardNo)
+    .sort((a, b) => Date.parse(a.timestamp || a.takenAt || 0) - Date.parse(b.timestamp || b.takenAt || 0));
+  for (const it of fresh) it.cardNo = `${prefix}-${pad3(next++)}`;
+  return { next, added: fresh.length };
+}
+
+// 품질 게이트 — 새 수집이 기존(실데이터)의 절반 미만이면 기존 파일을 지킨다.
+// 스크래퍼 장애로 0건이 온 날 대시보드가 통째로 비는 사고를 막는다.
+// ⚠️ prevCount 는 '실데이터' 기준이어야 한다. 더미를 기존으로 세면 릴스 몇 개뿐인 실계정이 통째로 거부된다.
+// ⚠️ 0건 자체는 여기서 막지 않는다 — 사진·캐러셀만 올리는 계정이 있고, 호출부가 안내 문구로 처리한다.
+function qualityGate(newCount, prevCount) {
+  if (prevCount > 0 && newCount < prevCount / 2) {
+    return { ok: false, reason: `새 수집 ${newCount}건이 기존 ${prevCount}건의 절반 미만` };
+  }
+  return { ok: true, reason: null };
+}
+
+// 스냅샷 한 줄 밀어넣기 — 같은 날짜면 교체(하루 한 점), 아니면 추가. 항상 날짜 오름차순.
+function upsertSnapshot(list, snap) {
+  const i = list.findIndex((s) => s.date === snap.date);
+  if (i >= 0) list[i] = snap; else list.push(snap);
+  list.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  return list;
+}
+
 module.exports = {
   ROOT, DATA_DIR, THUMBS, THUMB_WEB, MODEL,
-  loadEnv, log, notice, needKey,
+  parseEnv, loadEnv, log, notice, needKey,
   readJson, writeJson, dataPath,
+  isDemo, freshIfDemo, clearDemoThumbs,
+  assignCardNumbers, qualityGate, upsertSnapshot,
   sc, getCredits, scProfile, scReels, scPosts, scTranscript, scVideoUrl,
   normalizeProfile, normalizePost, normalizeGraphPost,
   commerceHintOf, cutSafe, avgViews, downloadThumb, pickThumb,

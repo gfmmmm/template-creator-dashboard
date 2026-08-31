@@ -10,6 +10,10 @@
 //  5) 썸네일 · 아바타 내려받기
 //  6) 카드번호(M-###) 승계·부여
 //  7) 품질 게이트 → posts.json 저장
+//  8) 첫 실수집이면 더미 흔적 1회 청소 (썸네일·settings·analysis·discoveries)
+//
+//  ⚠️ 이전 파일이 더미(demo:true)면 '없음'으로 취급한다. 그래야 가짜 추이가 이어 붙지 않고,
+//     품질 게이트가 더미 릴스를 기존으로 착각해 소규모 실계정을 거부하지 않는다.
 //
 //  사용법: node scripts/collect.js
 //  환경  : SCRAPECREATORS_API_KEY (없으면 안내 후 정상 종료)
@@ -18,6 +22,7 @@ const {
   loadEnv, log, notice, needKey, readJson, writeJson,
   scProfile, scReels, scPosts, scTranscript,
   avgViews, downloadThumb, getCredits, todayKST, pad3, limitOf,
+  isDemo, freshIfDemo, clearDemoThumbs, assignCardNumbers, qualityGate, upsertSnapshot,
 } = require('./lib.js');
 
 const FEED_PAGES = limitOf('FEED_PAGES', 3);        // 피드(사진·캐러셀) 페이지 수
@@ -34,7 +39,12 @@ async function main() {
     process.exit(0);
   }
 
-  const prev = readJson('posts.json', null);
+  // 이전 파일 — 더미(demo:true)는 '없음'으로 취급한다.
+  // 안 그러면 가짜 팔로워 추이가 실계정 그래프에 이어 붙고, 더미 릴스가 품질 게이트의 '기존'이 되어
+  // 릴스가 몇 개뿐인 실계정이 통째로 거부된다. 청소는 수집이 성공한 뒤(아래 9번)에 한 번만 한다.
+  const prevRaw = readJson('posts.json', null);
+  const wasDemo = isDemo(prevRaw);
+  const prev = freshIfDemo(prevRaw, { my: { posts: [] }, snapshots: [] });
   const prevPosts = prev?.my?.posts || [];
 
   // 1) 프로필
@@ -46,11 +56,14 @@ async function main() {
   const posts = await scReels(handle, key, { limit: (profile.postsCount || 50) + 10 });
   log(`릴스 ${posts.length}건`);
 
-  // 3) 품질 게이트 ①: 릴스가 기존의 절반 미만이면 수집을 폐기하고 기존 파일을 지킨다.
+  // 3) 품질 게이트: 릴스가 기존의 절반 미만이면 수집을 폐기하고 기존 파일을 지킨다.
   //    (스크래퍼 장애로 0건이 온 날 대시보드가 통째로 비는 사고를 막는다)
+  //    빨간 X 대신 경고 한 줄로 끝낸다 — 파일을 안 건드리는 게 목적이지 실패를 알리는 게 목적이 아니다.
+  //    prevPosts 는 위에서 더미를 걷어낸 값이라, 첫 실행이면 기준이 0 이라 무조건 통과한다.
   const prevReels = prevPosts.filter((p) => p.type === 'reel' || p.type === 'video').length;
-  if (prevReels > 0 && posts.length < prevReels * 0.5) {
-    console.log(`::warning::품질 게이트 — 새 릴스 ${posts.length}건이 기존 ${prevReels}건의 절반 미만이라 posts.json 을 그대로 둡니다`);
+  const gate = qualityGate(posts.length, prevReels);
+  if (!gate.ok) {
+    console.log(`::warning::품질 게이트 — ${gate.reason}라 posts.json 을 그대로 둡니다`);
     process.exit(0);
   }
   if (!posts.length && !prevPosts.length) {
@@ -107,20 +120,12 @@ async function main() {
       const n = Number(String(p.cardNo).slice(2));
       if (n > maxN) maxN = n;
     }
-    let next = maxN + 1;
-    let added = 0;
-    const fresh = [...posts].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
-    for (const p of fresh) {
-      if (prevNo[p.shortcode]) { p.cardNo = prevNo[p.shortcode]; continue; }
-      p.cardNo = `M-${pad3(next++)}`;
-      added++;
-    }
+    const { next, added } = assignCardNumbers(posts, 'M', maxN + 1, prevNo);
     log(`카드번호: 신규 ${added}건 · 마지막 M-${pad3(next - 1)}`);
   }
 
   // 9) 스냅샷 — 오늘 줄을 채워둔다(같은 날짜면 교체). 첫 수집날에도 추이 카드가 비지 않게.
-  const snapshots = (prev?.snapshots || []).filter((s) => s.date !== todayKST());
-  snapshots.push({
+  const snapshots = upsertSnapshot(prev?.snapshots || [], {
     date: todayKST(),
     my: {
       followers: profile.followers,
@@ -130,7 +135,27 @@ async function main() {
       avgViews: avgViews(posts),
     },
   });
-  snapshots.sort((a, b) => a.date.localeCompare(b.date));
+
+  // 10) 더미 청소 — 첫 실수집일 때만, 딱 한 번. 수집이 성공한 '뒤'라야
+  //     실데이터도 없는데 예시만 날아가는 일이 없다.
+  //     ⚠️ settings.json 은 사람 파일이지만 이 1회 청소만 수집기가 예외로 쓴다.
+  //     예시 소스 계정·예시 기둥이 남으면 발굴과 분류가 가짜 기준으로 돌기 때문이다.
+  if (wasDemo) {
+    log('🧹 예시 데이터를 지우고 실데이터로 시작합니다');
+    clearDemoThumbs();
+    writeJson('discoveries.json', { updatedAt: null, nextR: 1, sourceState: {}, items: [] });
+    writeJson('analysis.json', { pillars: {}, coaching: {} });
+    writeJson('settings.json', {
+      handle,
+      brief: '',
+      pillars: [],
+      sources: [],
+      minViews: 100000,
+      overrides: {},
+      commerceOverrides: {},
+      hidden: [],
+    });
+  }
 
   writeJson('posts.json', {
     updatedAt: new Date().toISOString(),

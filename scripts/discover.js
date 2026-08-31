@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   loadEnv, log, notice, needKey, readJson, writeJson, THUMBS,
-  scReels, scTranscript, downloadThumb, getCredits, pad3, median, limitOf,
+  scReels, scTranscript, downloadThumb, getCredits, pad3, median, limitOf, freshIfDemo,
 } = require('./lib.js');
 
 const FIRST_DAYS = limitOf('DISCOVER_FIRST_DAYS', 90);   // 첫 수집: 3개월 백필
@@ -40,7 +40,8 @@ async function main() {
   }
   const minViews = Number(settings?.minViews) > 0 ? Number(settings.minViews) : 100000;
 
-  const db = readJson('discoveries.json', null) || { items: [], sourceState: {}, nextR: 1, updatedAt: null };
+  // 더미(demo:true)는 '없음'으로 — 수집을 안 거치고 발굴부터 돌려도 예시 발굴이 실데이터에 섞이지 않는다.
+  const db = freshIfDemo(readJson('discoveries.json', null), { items: [], sourceState: {}, nextR: 1, updatedAt: null });
   db.items = db.items || [];
   db.sourceState = db.sourceState || {};
   db.nextR = db.nextR || 1;
