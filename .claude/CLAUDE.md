@@ -1,8 +1,12 @@
 # 크리에이터 대시보드 — 이 폴더에서 Claude Code가 지킬 것
 
+이 폴더는 인스타 크리에이터의 개인 대시보드다. 사용자는 AI 초보자다. 존댓말로, 전문 용어에는 괄호 설명을 붙이고, 명령어는 사용자가 아니라 Claude가 실행한다.
+
 ## 처음 온 사람
 
-사용자가 "구축 가이드대로 진행해줘", "세팅해줘", "처음이에요", "이어서 해줘"라고 하면 `SETUP.md`를 열고 그 문서의 원칙과 단계를 그대로 따른다. 한 단계씩, 확인 후 다음으로. `.setup-progress.json`이 있으면 거기서 이어간다.
+사용자가 "구축 가이드대로 진행해줘", "이어서 진행해줘", "세팅해줘", "처음이에요", "이어서 해줘"라고 하면 `SETUP.md`를 열고 그 문서의 원칙과 단계를 그대로 따른다. 한 단계씩, 확인 후 다음으로. `.setup-progress.json`이 있으면 거기서 이어간다.
+
+"3단계까지 진행해줘"처럼 **"N단계까지 진행해줘"**라고 하면 N단계의 검증을 통과한 뒤 멈추고 "여기까지입니다. 강사님 지시를 기다려 주세요"라고 말한다(수업에서 구간을 끊어 진행할 때 쓴다 — `SETUP.md` 맨 아래 "수업에서 쓸 때" 절).
 
 ## 명령 (사용자가 말로 시키면 이걸 실행)
 
@@ -16,10 +20,11 @@
 | "내 릴스 코칭해줘" | `node scripts/coach.js` |
 | "채널 정체성 자동 분석해줘" | `node scripts/brief.js` → 결과를 요약해 보여주고 "고칠 곳 있나요?" 묻기 |
 | "기둥 정해서 분류해줘" | 사용자와 기둥 4~5개·목표% 합의 → `settings.pillars`에 쓰기 → `node scripts/classify.js` |
-| "M-012는 흥미유발로 바꿔줘" | `settings.overrides`에 기록 (analysis.json은 건드리지 않는다) |
-| "R-012 숨겨줘" | `settings.hidden`에 추가 |
-| "올려줘" | `git add -A && git commit -m "갱신 YYYY-MM-DD" && git pull --rebase && git push`. 충돌이 data/posts·discoveries·analysis.json에서 나면 원격 것을 받고(`git checkout --theirs`) 로컬 스크립트를 다시 실행 |
-| "자동화 켜줘" | `.env`의 키 2개를 `gh secret set`으로 이 저장소에 등록 → `gh workflow run weekly.yml` → "Actions 탭에서 5~10분 뒤 커밋이 생기고 Vercel이 다시 배포합니다" 안내. gh 미로그인이면 `gh auth login --web` 먼저 |
+| "M-012는 ○○ 기둥으로 바꿔줘" | cardNo로 `posts.json`에서 shortcode를 찾아 `settings.overrides["<shortcode>"] = "○○"` 기록 (analysis.json은 건드리지 않는다) |
+| "R-012 숨겨줘" | `settings.hidden`에 "R-012" 추가 |
+| "발굴 기준을 5만으로 낮춰줘" | `settings.minViews = 50000` 으로 고치고 `node scripts/discover.js` 재실행 |
+| "올려줘" | `git add -A && git commit -m "갱신 YYYY-MM-DD"` → **push 전에 `git pull --rebase` 먼저** → `git push`. 충돌이 data/posts·discoveries·analysis.json에서 나면 원격(봇) 것을 받고(`git checkout --theirs <파일>` → `git add` → `git rebase --continue`) 해당 로컬 스크립트를 다시 실행 |
+| "자동화 켜줘" | `.env`의 키 2개를 `gh secret set SCRAPECREATORS_API_KEY -R <owner/repo>` · `GEMINI_API_KEY`로 등록(저장소는 `gh repo view --json nameWithOwner`로 확인, 값은 파일에서 파이프로 — 채팅 출력 금지) → `gh workflow run weekly.yml` → "Actions 탭에서 5~10분 뒤 커밋이 생기고 Vercel이 다시 배포합니다" 안내. gh 미로그인이면 `SETUP.md` 5단계의 로그인 절차를 안내한다(그 한 줄만 사용자가 직접 친다) |
 | "배포해줘" (GitHub 없이) | `vercel --prod --yes` |
 | "점검해줘" | `node --check js/*.js scripts/*.js` → 4개 JSON 파싱 → serve.js 띄워 200 확인 → 결과 한 줄씩 |
 | "되돌려줘" | 직전에 고친 파일을 원래대로. git이 있으면 `git checkout -- <파일>` 또는 `git revert HEAD`(커밋된 경우). 무엇을 되돌렸는지 한 줄 보고 |
