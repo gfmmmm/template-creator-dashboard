@@ -7,7 +7,7 @@
 ## Claude Code에게 — 사용자가 이 링크를 주면서 "다운받아서 구축 가이드대로 진행해줘"라고 했다면
 
 1. 사용자에게 폴더를 어디에 둘지 묻는다(기본: 바탕화면의 `creator-dashboard`).
-2. ZIP을 받아 푼다: `curl -L -o cd.zip https://github.com/<소유자>/template-creator-dashboard/archive/refs/heads/main.zip && unzip -q cd.zip && mv template-creator-dashboard-main <폴더> && rm cd.zip`
+2. ZIP을 받아 푼다: `curl -L -o cd.zip https://github.com/gfmmmm/template-creator-dashboard/archive/refs/heads/main.zip && unzip -q cd.zip && mv template-creator-dashboard-main <폴더> && rm cd.zip`
 3. 사용자에게 딱 두 줄 안내한다 — "폴더가 생겼어요. 터미널에서 `cd <폴더>` 를 치고 `claude` 를 다시 실행한 뒤, '구축 가이드대로 진행해줘'라고 말해주세요." (이 폴더의 규칙과 가이드는 그 폴더에서 열어야 읽힌다.)
 4. 그 폴더에서 열린 Claude Code는 `SETUP.md`를 읽고 0단계부터 진행한다.
 
