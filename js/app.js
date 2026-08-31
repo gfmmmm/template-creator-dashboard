@@ -25,10 +25,29 @@ const S = {
 
 const PILLAR_FALLBACK = '미분류';
 const PILLAR_COLORS = ['#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EC4899'];
-// 성과 판정 기준 — 본가 config.thresholds 를 상수로 고정 (설정 파일 없이 돌게)
+// 성과 판정 기준 — 설정 파일 없이 돌게 상수로 고정
 const TH = { viral: 2, under: 0.5, pillarTolerancePp: 10 };
+// 발굴 기준 조회수 기본값 — settings.json 에 minViews 가 없을 때 쓰는 단 하나의 출처.
+// (기본값을 여러 곳에 흩어 적으면 화면마다 다른 숫자가 보인다)
+const DEFAULT_MIN_VIEWS = 100000;
+
+// ── 값 안전화 3종 ──────────────────────────────────────────
+// data/*.json 은 봇이 긁어온 남의 캡션·핸들이 섞인 파일이다. 화면 문자열로 조립되기 전에 반드시 통과시킨다.
 // href 안전화 — javascript: 등 위험 scheme 차단. http(s)만 통과, 아니면 무해한 '#'.
 const safeHref = (u) => { const s = String(u || '').trim(); return /^https?:\/\//i.test(s) ? s : '#'; };
+// 이미지 주소 — http(s) 또는 프로젝트 안 상대경로만. 그 밖(javascript:, data: 등)은 빈 값 → 대체 아이콘.
+const safeImg = (u) => {
+  const s = String(u || '').trim();
+  return /^https?:\/\//i.test(s) || /^(\.?\/)?[\w.-]+(\/[\w.%-]+)*\.(jpe?g|png|webp|gif|svg)$/i.test(s) ? s : '';
+};
+// CSS url() 안에 들어갈 값 — 따옴표·괄호·역슬래시·세미콜론·공백이 있으면 통째로 버린다.
+// (url(...) 를 닫고 뒤에 다른 CSS 선언을 붙이는 스타일 주입 차단)
+const cssUrl = (u) => {
+  const s = safeImg(u);
+  return /["'()\\;\s]/.test(s) ? '' : s;
+};
+// 인스타 shortcode — 임베드 주소에 끼우기 전 형식 검증. 경로 탈출(/, ?, #) 차단.
+const safeShortcode = (s) => (/^[A-Za-z0-9_-]{1,64}$/.test(String(s || '')) ? String(s) : '');
 
 // ───────────────────────── 공용 계산 ─────────────────────────
 const myPosts = () => S.posts.my.posts || [];
@@ -59,6 +78,9 @@ function pillarOf(post) {
 const COMMERCE_AD = /#\s?(광고|협찬)|#AD\b|유료\s*광고|제작\s*지원|협찬\s*받|제공\s*받|paid\s*partnership/i;
 const COMMERCE_SELL = /공구|공동\s*구매|스마트\s*스토어|프로필\s*링크|구매\s*링크|와디즈|펀딩|마감\s*임박/;
 const COMMERCE_BADGE = { '공구': '🛒', '광고': '📢' };
+// 배지 조회는 반드시 이 함수로 — 맵에 없는 값(직접 적어 넣은 분류 등)이면 화면에 'undefined' 가
+// 찍히거나 Object.prototype 의 것이 튀어나온다. 모르는 분류는 중립 배지로 받는다.
+const commerceBadge = (v) => (Object.prototype.hasOwnProperty.call(COMMERCE_BADGE, v) ? COMMERCE_BADGE[v] : '🏷');
 function commerceOf(x) {
   const o = (S.settings.commerceOverrides || {})[x.shortcode];
   if (o) return o === '일반' ? null : o;   // 사람이 고친 건 안 뒤집는다
@@ -122,23 +144,44 @@ async function boot() {
     U.json('data/analysis.json'),
   ]);
   const bn = document.getElementById('bootNote');
+  // 모달 닫기 배선은 렌더보다 먼저 — 렌더가 실패해도 열린 모달에 갇히지 않게
+  wireModal();
+  wireCardNoCopy();
+
   if (!settings || !posts || !posts.my) {
     if (bn) bn.innerHTML = '⚠️ data 폴더의 JSON을 읽지 못했어요.<br>파일을 브라우저로 직접 열면 막힙니다 — Claude에게 <b>"대시보드 열어줘"</b>라고 말씀해 주세요 (node scripts/serve.js).';
     return;
   }
-  S.settings = Object.assign({ pillars: [], sources: [], overrides: {}, commerceOverrides: {}, hidden: [], minViews: 100000 }, settings);
+  S.settings = Object.assign({ pillars: [], sources: [], overrides: {}, commerceOverrides: {}, hidden: [], minViews: DEFAULT_MIN_VIEWS }, settings);
   S.posts = posts;
   S.disc = disc || { items: [] };
   S.analysis = analysis || { pillars: {}, coaching: {} };
   S.posts.snapshots = (posts.snapshots || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  if (bn) bn.remove();
 
-  renderAll();
-  route();
+  // 렌더 중 예외가 나도 백지로 두지 않는다 — 안내 문구를 남기고 콘솔에 원인을 찍는다.
+  // (안내를 지우는 건 렌더가 끝까지 성공한 뒤)
+  try {
+    renderAll();
+    route();
+    if (bn) bn.remove();
+  } catch (e) {
+    console.error('[대시보드] 화면을 그리다 멈췄어요', e);
+    if (bn) {
+      bn.innerHTML = '⚠️ 데이터는 읽었지만 화면을 그리다 멈췄어요.<br>' +
+        'data 폴더의 JSON 형식이 어긋났을 수 있어요 — Claude에게 <b>"대시보드가 안 떠"</b>라고 말씀해 주세요.<br>' +
+        `<span style="font-size:12px;opacity:.7">${U.esc(e && e.message ? e.message : String(e))}</span>`;
+    }
+  }
   window.addEventListener('hashchange', route);
-  document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+}
+
+// 모달 닫기 3경로 — 배경 클릭 · ✕ 버튼 · Esc
+function wireModal() {
+  const m = document.getElementById('modal');
+  if (m) m.addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+  const x = document.getElementById('modalClose');
+  if (x) x.addEventListener('click', closeModal);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-  wireCardNoCopy();
 }
 
 // 모달 닫기 — 내용(임베드 iframe 포함)을 비워 재생·소리를 확실히 정지
@@ -168,10 +211,12 @@ function renderAll() {
   renderDiscover(); renderSettings();
 }
 
+// 탭 전환 — 화이트리스트에 없는 해시(#nope, 옛 북마크)로 들어와도 첫 탭으로 떨어진다.
+// (폴백이 없으면 모든 view 가 꺼져 화면이 통째로 백지가 된다)
+const VIEWS = ['home', 'refs', 'settings'];
 function route() {
   const hash = (location.hash || '#home').slice(1);
-  const known = ['home', 'refs', 'settings'];
-  const cur = known.includes(hash) ? hash : 'home';
+  const cur = VIEWS.includes(hash) ? hash : VIEWS[0];
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('on', v.id === 'view-' + cur));
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
 }
@@ -201,14 +246,15 @@ function renderProfileHeader() {
   const totalViews = posts.reduce((s, x) => s + (x.views || 0), 0);
   const best = [...posts].sort((a, b) => (b.views || 0) - (a.views || 0))[0];
   const link = (p.externalUrl || '').replace(/^https?:\/\//, '');
+  const avatar = safeImg(p.avatar);
   document.getElementById('profileHeader').innerHTML =
-    (p.avatar ? `<img class="ph-avatar" src="${U.esc(p.avatar)}" alt="">` : '<div class="ph-noav">🙂</div>') +
+    (avatar ? `<img class="ph-avatar" src="${U.esc(avatar)}" alt="">` : '<div class="ph-noav">🙂</div>') +
     `<div class="ph-info">
       <div class="ph-top"><span class="ph-handle">@${U.esc(p.handle || S.settings.handle || '')}</span>${p.verified ? '<span class="ph-verified">✔</span>' : ''}</div>
       <div class="ph-name">${U.esc(p.fullName || '')}</div>
       <div class="ph-stats">
         <span class="ph-stat"><b>${U.fmt(postsCount)}</b><span>게시물</span></span>
-        <span class="ph-stat" title="정확한 팔로워 수"><b>${followers != null ? followers.toLocaleString('ko-KR') : '—'}</b><span>팔로워</span></span>
+        <span class="ph-stat" title="정확한 팔로워 수"><b>${U.num(followers)}</b><span>팔로워</span></span>
         <span class="ph-stat"><b>${U.fmt(following)}</b><span>팔로우</span></span>
       </div>
       ${p.biography ? `<div class="ph-bio">${U.esc(p.biography)}</div>` : ''}
@@ -259,8 +305,9 @@ function renderDonutCards(posts) {
   for (const p of filtered) {
     const card = U.el('div', { class: 'dp-pcard', style: 'cursor:pointer', title: (p.caption || '').split('\n')[0] });
     card.addEventListener('click', () => openPostModal(p));
+    const th = safeImg(p.thumb);
     card.innerHTML =
-      (p.thumb ? `<img src="${U.esc(p.thumb)}" loading="lazy" alt="">` : '<div class="dp-noimg">🎬</div>') +
+      (th ? `<img src="${U.esc(th)}" loading="lazy" alt="">` : '<div class="dp-noimg">🎬</div>') +
       `<div class="dp-body"><div class="dp-views">${U.fmt(p.views)}</div><div class="dp-cap">${U.esc((p.caption || '').split('\n')[0].slice(0, 30))}</div></div>`;
     grid.appendChild(card);
   }
@@ -408,18 +455,18 @@ function renderTrend() {
 
   if (S.T.metric === 'uploads') { renderUploadRhythm(myPosts()); return; }
 
-  const snaps = snapshots();
-  if (snaps.length < 2) {
+  // 차트에는 유한한 숫자만 넘긴다 — JSON 이 문자열/NaN 을 물고 와도 좌표와 툴팁이 깨지지 않게
+  const pts = snapshots().map((s) => ({ t: Date.parse(s.date), v: Number(s.my?.followers) }))
+    .filter((pt) => Number.isFinite(pt.t) && Number.isFinite(pt.v))
+    .map((pt) => ({ ...pt, abs: pt.v }));
+  if (pts.length < 2) {
     root.appendChild(U.el('div', { class: 'empty-note' }, '팔로워 추이는 스냅샷이 2개 이상 쌓이면 그려집니다 — 매일 아침 자동 수집 중'));
     descEl.textContent = '내 계정 팔로워 추이 — 매일 스냅샷 기반';
     return;
   }
-  const pts = snaps.map((s) => ({ t: Date.parse(s.date), v: s.my?.followers }))
-    .filter((pt) => pt.v != null)
-    .map((pt) => ({ ...pt, abs: pt.v }));
-  const first = pts.length ? pts[0].v : null;
-  const last = pts.length ? pts[pts.length - 1].v : null;
-  const delta = (first != null && last != null) ? last - first : null;
+  const first = pts[0].v;
+  const last = pts[pts.length - 1].v;
+  const delta = last - first;
   const dStr = delta == null ? '—' : (delta >= 0 ? `+${delta.toLocaleString('ko-KR')}` : delta.toLocaleString('ko-KR'));
   // 숫자만 던지지 않는다 — 판정 한 마디를 붙인다
   const pct = (delta != null && last) ? (delta / last) * 100 : null;
@@ -428,7 +475,7 @@ function renderTrend() {
       : pct > 0 ? `전체의 ${pct.toFixed(1)}% 증가 — 좋은 흐름이에요`
         : `전체의 ${Math.abs(pct).toFixed(1)}% 감소 — 최근 콘텐츠를 점검해볼 신호예요`;
   descEl.innerHTML =
-    `내 계정 팔로워 <b>${last != null ? last.toLocaleString('ko-KR') : '—'}</b>명` +
+    `내 계정 팔로워 <b>${U.num(last)}</b>명` +
     `<span class="fl-delta ${(delta ?? 0) >= 0 ? 'up' : 'dn'}" style="margin-left:8px">${dStr}</span>` +
     `<span style="font-size:11.5px;color:var(--muted);margin-left:6px">기간 증감${judge ? ' · ' + judge : ''}</span>`;
   // 시작점 기준 증감을 그린다(abs 는 툴팁용). minSpanRatio 로 미세 증감이 절벽처럼 보이는 왜곡 방지
@@ -463,6 +510,8 @@ function lensFmt(lens, v) {
   return U.fmt(v);
 }
 const FMT_LABELS = { reel: '릴스', carousel: '캐러셀', image: '이미지', video: '동영상' };
+// 모르는 포맷은 원문 그대로 보여주되 반드시 이스케이프해서 — 수집기가 새 타입을 물고 와도 안전하게
+const fmtLabel = (t) => U.esc(Object.prototype.hasOwnProperty.call(FMT_LABELS, t) ? FMT_LABELS[t] : (t || '기타'));
 
 // 성과 등급 — ×NN 대신 직관적 라벨. 보통(중앙값) 대비 배수 기준.
 function tierOf(ratio) {
@@ -608,7 +657,7 @@ function renderLibrary() {
     const avgV = vs.length ? vs.reduce((s, p) => s + p.views, 0) / vs.length : null;
     const es = posts.map(engageOf).filter((v) => v != null);
     const avgE = es.length ? es.reduce((s, v) => s + v, 0) / es.length : null;
-    countTxt = `${S.F.commerce === '일반' ? '일반' : COMMERCE_BADGE[S.F.commerce] + ' ' + S.F.commerce} 콘텐츠 ${posts.length}개 · 평균 조회 보통의 ×${allMed && avgV ? (avgV / allMed).toFixed(1) : '—'} · 평균 반응률 ${avgE != null ? (avgE * 100).toFixed(1) + '%' : '—'}`;
+    countTxt = `${S.F.commerce === '일반' ? '일반' : commerceBadge(S.F.commerce) + ' ' + S.F.commerce} 콘텐츠 ${posts.length}개 · 평균 조회 보통의 ×${allMed && avgV ? (avgV / allMed).toFixed(1) : '—'} · 평균 반응률 ${avgE != null ? (avgE * 100).toFixed(1) + '%' : '—'}`;
   }
   document.getElementById('libCount').textContent = countTxt;
 
@@ -632,7 +681,7 @@ function renderLibrary() {
       const big = isDate ? cardDate(p.timestamp) : lensFmt(lens, lensVal);
       // 어떤 렌즈로 보든 조회수는 항상 보이게 (조회수 렌즈일 땐 큰 숫자가 이미 조회수라 생략)
       const viewsBit = (lens.key !== 'views' && p.views != null) ? `▶ ${U.fmt(p.views)} · ` : '';
-      const tail = isDate ? `${viewsBit}${FMT_LABELS[p.type] || p.type}` : `${viewsBit}${cardDate(p.timestamp)} · ${FMT_LABELS[p.type] || p.type}`;
+      const tail = isDate ? `${viewsBit}${fmtLabel(p.type)}` : `${viewsBit}${cardDate(p.timestamp)} · ${fmtLabel(p.type)}`;
       // 조회수 순위 대비 이동 ▲▼
       let deltaChip = '';
       const vr = viewsRank[p.shortcode];
@@ -642,11 +691,13 @@ function renderLibrary() {
           : dd < 0 ? `<span class="gdelta down" title="조회수 순위보다 ${-dd}칸 아래">▼${-dd}</span>` : '';
       }
       const card = U.el('div', { class: 'gcard', onclick: () => openPostModal(p) });
+      const th = safeImg(p.thumb);
+      const com = commerceOf(p);
       card.innerHTML =
         '<div class="gthumb-wrap">' +
-        (p.thumb ? `<img class="gthumb" src="${U.esc(p.thumb)}" loading="lazy" alt="">` : '<div class="gnoimg">🎬</div>') +
+        (th ? `<img class="gthumb" src="${U.esc(th)}" loading="lazy" alt="">` : '<div class="gnoimg">🎬</div>') +
         `<span class="grank">${idx + 1}</span>` +
-        (commerceOf(p) ? `<span class="gcom" title="${commerceOf(p)}">${COMMERCE_BADGE[commerceOf(p)]}</span>` : '') +
+        (com ? `<span class="gcom" title="${U.esc(com)}">${commerceBadge(com)}</span>` : '') +
         `<span class="gpill">${U.esc(pillarOf(p))}</span>` +
         '</div>' +
         // 숫자는 썸네일 밖으로 — 사진 위 오버레이보다 읽기 편하다
@@ -696,10 +747,12 @@ function renderLibrary() {
           : '<span class="delta same">=</span>';
     }
     const tr = U.el('tr', { style: 'cursor:pointer' });
+    const th = safeImg(p.thumb);
+    const com = commerceOf(p);
     tr.innerHTML =
       `<td><span class="rank">${rank}</span>${deltaHtml}</td>` +
-      `<td>${p.thumb ? `<img src="${U.esc(p.thumb)}" loading="lazy" alt="">` : ''}</td>` +
-      `<td><span class="cap">${commerceOf(p) ? COMMERCE_BADGE[commerceOf(p)] + ' ' : ''}${U.esc((p.caption || '(캡션 없음)').split('\n')[0])}</span><span class="cdate">${cardNoHtml(p.cardNo)}${U.date(p.timestamp)} · ${FMT_LABELS[p.type] || p.type}</span></td>` +
+      `<td>${th ? `<img src="${U.esc(th)}" loading="lazy" alt="">` : ''}</td>` +
+      `<td><span class="cap">${com ? commerceBadge(com) + ' ' : ''}${U.esc((p.caption || '(캡션 없음)').split('\n')[0])}</span><span class="cdate">${cardNoHtml(p.cardNo)}${U.date(p.timestamp)} · ${U.esc(FMT_LABELS[p.type] || p.type)}</span></td>` +
       cellFor(p, 'views') +
       `<td class="r">${U.fmt(p.likes)}</td>` +
       cellFor(p, 'comments') +
@@ -749,13 +802,14 @@ function openPostModal(p) {
       ? '<div class="dm-hint" style="margin-top:10px">🎬 영상 코칭 대기 중 — Claude에게 <b>"내 릴스 코칭해줘"</b>라고 하시면 붙습니다 (매주 월요일엔 자동)</div>'
       : '');
 
+  const th = safeImg(p.thumb);
   document.getElementById('modalContent').innerHTML =
     '<div class="mwrap">' +
-    (p.thumb ? `<img src="${U.esc(p.thumb)}" alt="">` : '<div class="rc-noimg" style="width:150px;height:214px;font-size:34px">🎬</div>') +
+    (th ? `<img src="${U.esc(th)}" alt="">` : '<div class="rc-noimg" style="width:150px;height:214px;font-size:34px">🎬</div>') +
     `<div class="mbody">
       <div style="font-size:12.5px;color:var(--accent);font-weight:700">@${U.esc(S.posts.my.profile?.handle || '')} · ${U.esc(pillarOf(p))}</div>
       <div style="font-size:16.5px;font-weight:800;margin:4px 0;line-height:1.45">${U.esc((p.caption || '(캡션 없음)').split('\n')[0])}</div>
-      <div style="font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap">${U.date(p.timestamp)} · ${FMT_LABELS[p.type] || p.type} ${verdict} ${cardNoHtml(p.cardNo, true)}</div>
+      <div style="font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap">${U.date(p.timestamp)} · ${fmtLabel(p.type)} ${verdict} ${cardNoHtml(p.cardNo, true)}</div>
       <div class="mstats">${[
         stat(p.views, '조회수'), stat(p.likes, '좋아요'), stat(p.comments, '댓글'),
         statTxt(lensFmt(lensDef('engage'), engageOf(p)), '반응률 · 추정'),
@@ -795,7 +849,7 @@ function renderDiscover() {
   const dvRoot = document.getElementById('discViews');
   if (S.D.thr == null) {
     const saved = Number(localStorage.getItem('discThr'));
-    S.D.thr = saved > 0 ? saved : Math.max(1, Math.round((S.settings.minViews || 100000) / 10000));
+    S.D.thr = saved > 0 ? saved : Math.max(1, Math.round((Number(S.settings.minViews) || DEFAULT_MIN_VIEWS) / 10000));
   }
   if (dvRoot) {
     dvRoot.innerHTML = '';
@@ -887,11 +941,13 @@ function renderDiscover() {
   }
   for (const d of shown) {
     const card = U.el('div', { class: 'dcard', onclick: () => openDiscModal(d) });
+    const th = safeImg(d.thumb);
+    const com = commerceOf(d);
     card.innerHTML =
       '<div class="dthumb-wrap">' +
-      (d.thumb ? `<img class="dthumb" src="${U.esc(d.thumb)}" loading="lazy" alt="">` : '<div class="dnoimg">🎬</div>') +
+      (th ? `<img class="dthumb" src="${U.esc(th)}" loading="lazy" alt="">` : '<div class="dnoimg">🎬</div>') +
       `<span class="dbadge ${d.status === 'analyzed' ? 'ana' : 'wait'}">${d.status === 'analyzed' ? '✨ 분석완료' : '⏳ 분석대기'}</span>` +
-      (commerceOf(d) ? `<span class="dcom" title="${commerceOf(d)}">${COMMERCE_BADGE[commerceOf(d)]}</span>` : '') +
+      (com ? `<span class="dcom" title="${U.esc(com)}">${commerceBadge(com)}</span>` : '') +
       `<div class="dviews"><b>${U.fmt(d.views)}</b><div class="acc">@${U.esc(d.sourceHandle || '')}</div></div>` +
       '</div>' +
       `<div class="dtopic">${cardNoHtml(d.cardNo)}${U.esc(d.analysis?.주제 || (d.caption || '').replace(/\n/g, ' ') || '(분석 대기 중)')}</div>`;
@@ -936,12 +992,15 @@ function openDiscModal(d) {
       '</div>'
     : '<div class="dm-pending"><div class="dm-pend-icon">⏳</div><p>아직 영상 분석 대기 중이에요.<br>Claude에게 <b>"레퍼런스 분석해줘"</b>라고 하시면 여기에 채워집니다.</p></div>';
 
+  // 썸네일은 CSS url() 안으로 들어가므로 cssUrl 로 한 번 더 거른다 (스타일 선언 탈출 차단)
+  const bg = cssUrl(d.thumb);
+  const sc = safeShortcode(d.shortcode);
   document.getElementById('modalContent').innerHTML =
     '<div class="mwrap disc-modal ref-modal">' +
     // 임베드가 못 뜨는 환경에서 회색 공백만 남지 않게 — 썸네일을 바닥에 깔고 그 위에 임베드를 얹는다
-    `<div class="rmodal-embed-wrap"${d.thumb ? ` style="background-image:url(${U.esc(d.thumb)})"` : ''}>` +
+    `<div class="rmodal-embed-wrap"${bg ? ` style="background-image:url('${U.esc(bg)}')"` : ''}>` +
     '<div class="embed-fallback">영상이 안 보이면 아래 <b>인스타에서 열기</b>를 눌러주세요</div>' +
-    `<iframe class="rmodal-embed" src="https://www.instagram.com/reel/${U.esc(d.shortcode)}/embed/" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" loading="lazy" title="릴스"></iframe>` +
+    (sc ? `<iframe class="rmodal-embed" src="https://www.instagram.com/reel/${encodeURIComponent(sc)}/embed/" scrolling="no" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" loading="lazy" title="릴스"></iframe>` : '') +
     '</div>' +
     '<div class="mbody">' +
       `<div class="dm-meta">@${U.esc(d.sourceHandle || '')} · <b>${U.fmt(d.views)}회</b> · ${cardDate(d.takenAt)} ${cardNoHtml(d.cardNo, true)}</div>` +
@@ -1007,7 +1066,7 @@ function renderSettings() {
     '<dl class="kv">' +
     (S.settings.pillars || []).map((p) => {
       const n = counts[p.name] || 0;
-      return `<dt>${U.esc(p.name)}</dt><dd>${n}개 · 실제 ${((n / total) * 100).toFixed(0)}% <span style="color:var(--muted)">/ 목표 ${p.targetPercent || 0}%</span></dd>`;
+      return `<dt>${U.esc(p.name)}</dt><dd>${n}개 · 실제 ${((n / total) * 100).toFixed(0)}% <span style="color:var(--muted)">/ 목표 ${U.num(p.targetPercent || 0)}%</span></dd>`;
     }).join('') +
     (counts[PILLAR_FALLBACK] ? `<dt>미분류</dt><dd>${counts[PILLAR_FALLBACK]}개</dd>` : '') +
     '</dl>' +
@@ -1032,8 +1091,10 @@ function renderSettings() {
   // ④ 자동화 상태 — 마지막 실행일과 지연 경고
   const now = Date.now(), day = 86400e3;
   const ago = (t) => {
-    if (!t) return { txt: '기록 없음', d: Infinity };
-    const d = Math.floor((now - new Date(t).getTime()) / day);
+    // 날짜로 못 읽히는 값(형식이 깨진 JSON)도 '기록 없음' 으로 — 'NaN일 전' 이 화면에 나가지 않게
+    const ms = t ? new Date(t).getTime() : NaN;
+    if (!Number.isFinite(ms)) return { txt: '기록 없음', d: Infinity };
+    const d = Math.floor((now - ms) / day);
     return { txt: d <= 0 ? '오늘 ✓' : d === 1 ? '어제 ✓' : `${d}일 전 ✓`, d };
   };
   const rows = cycleRows();
@@ -1053,16 +1114,17 @@ function renderSettings() {
   // ⑤ 크레딧 · 프로젝트 정보
   const snaps = snapshots();
   // 크레딧은 수집·발굴 둘 다 기록한다 — 나중에 돈 쪽이 최신값 (발굴이 3일마다라 대개 더 신선)
-  const credits = (String(S.disc.updatedAt || '') > String(S.posts.updatedAt || '') && S.disc.creditsRemaining != null)
+  const creditsRaw = (String(S.disc.updatedAt || '') > String(S.posts.updatedAt || '') && S.disc.creditsRemaining != null)
     ? S.disc.creditsRemaining : S.posts.creditsRemaining;
+  const credits = Number.isFinite(Number(creditsRaw)) && creditsRaw != null ? Number(creditsRaw) : null;
   const info = U.el('div', { class: 'set-sec' });
   info.innerHTML =
     '<h2>크레딧 · 프로젝트 정보</h2>' +
     '<dl class="kv">' +
     `<dt>내 계정</dt><dd>@${U.esc(S.settings.handle || '')}</dd>` +
-    `<dt>남은 수집 크레딧</dt><dd>${credits != null ? credits.toLocaleString('ko-KR') : '—'} <span style="color:var(--muted)">(마지막 수집 시점)</span></dd>` +
+    `<dt>남은 수집 크레딧</dt><dd>${U.num(credits)} <span style="color:var(--muted)">(마지막 수집 시점)</span></dd>` +
     `<dt>발굴 기준 조회수</dt><dd>${U.fmt(S.settings.minViews)} 이상</dd>` +
-    `<dt>스냅샷</dt><dd>${snaps.length}개 ${snaps.length ? `(${snaps[0].date} ~ ${snaps[snaps.length - 1].date})` : ''}</dd>` +
+    `<dt>스냅샷</dt><dd>${snaps.length}개 ${snaps.length ? `(${U.date(snaps[0].date)} ~ ${U.date(snaps[snaps.length - 1].date)})` : ''}</dd>` +
     `<dt>게시물 수집 시각</dt><dd>${U.dateKo(S.posts.updatedAt)}</dd>` +
     `<dt>숨긴 레퍼런스</dt><dd>${(S.settings.hidden || []).length}건</dd>` +
     '</dl>' +

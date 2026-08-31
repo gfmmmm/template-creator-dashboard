@@ -435,7 +435,8 @@ td.active{font-weight:700;color:var(--accent)}
   </section>
 </main>
 
-<div id="modal"><div id="modalBox"><button class="mx" onclick="closeModal()">✕</button><div id="modalContent"></div></div></div>
+<!-- 닫기 배선은 js/app.js 의 wireModal() 에서 — 인라인 onclick 을 두지 않는다 -->
+<div id="modal"><div id="modalBox"><button class="mx" id="modalClose" type="button" aria-label="닫기">✕</button><div id="modalContent"></div></div></div>
 
 <script src="js/util.js"></script>
 <script src="js/charts.js"></script>

@@ -1,7 +1,7 @@
 'use strict';
-// 순수 SVG 차트 — 외부 라이브러리 0. (본가에서 ECharts 1.03MB 제거)
+// 순수 SVG 차트 — 외부 라이브러리 0. 이 파일이 차트의 전부다.
 // 원칙: 축 1개, 얇은 마크, 세그먼트 사이 2px 간격, 범례는 항상 텍스트 라벨 동반.
-// 남긴 것: donut(콘텐츠 기둥) · line(팔로워 추이). 호출부 없는 차트는 옮기지 않았다.
+// 종류는 둘뿐 — donut(콘텐츠 기둥) · line(팔로워 추이).
 
 const C = {
   NS: 'http://www.w3.org/2000/svg',
@@ -166,11 +166,12 @@ const C = {
       const dot = this.node('circle', { cx: x(p.t), cy: y(p.v), r: '3.6', fill: '#fff', stroke: color, 'stroke-width': '2' });
       dot.addEventListener('mouseenter', () => {
         const rect = svg.getBoundingClientRect();
+        // 툴팁은 innerHTML 로 들어간다 — 숫자로 확정된 값만 넣는다
         let valStr;
-        if (p.abs != null) {
+        if (Number.isFinite(p.abs)) {
           valStr = `${p.abs.toLocaleString('ko-KR')}명`;
-          if (p.dv != null) valStr += ` <span style="opacity:.75">(${p.dv >= 0 ? '+' : ''}${p.dv.toLocaleString('ko-KR')})</span>`;
-        } else valStr = fmt(p.v);
+          if (Number.isFinite(p.dv)) valStr += ` <span style="opacity:.75">(${p.dv >= 0 ? '+' : ''}${p.dv.toLocaleString('ko-KR')})</span>`;
+        } else valStr = U.esc(fmt(p.v));
         const dd = new Date(p.t);
         tipEl.innerHTML = `<b>${dd.getMonth() + 1}월 ${dd.getDate()}일</b> · ${valStr}`;
         tipEl.style.opacity = '1';
