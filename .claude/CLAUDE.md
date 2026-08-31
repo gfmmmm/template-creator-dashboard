@@ -26,7 +26,7 @@
 | "올려줘" | `git add -A && git commit -m "갱신 YYYY-MM-DD"` → **push 전에 `git pull --rebase` 먼저** → `git push`. 충돌이 data/posts·discoveries·analysis.json에서 나면 원격(봇) 것을 받고(`git checkout --theirs <파일>` → `git add` → `git rebase --continue`) 해당 로컬 스크립트를 다시 실행 |
 | "자동화 켜줘" | `.env`의 키 2개를 `gh secret set SCRAPECREATORS_API_KEY -R <owner/repo>` · `GEMINI_API_KEY`로 등록(저장소는 `gh repo view --json nameWithOwner`로 확인, 값은 파일에서 파이프로 — 채팅 출력 금지) → `gh workflow run weekly.yml` → "Actions 탭에서 5~10분 뒤 커밋이 생기고 Vercel이 다시 배포합니다" 안내. gh 미로그인이면 `SETUP.md` 5단계의 로그인 절차를 안내한다(그 한 줄만 사용자가 직접 친다) |
 | "배포해줘" (GitHub 없이) | `vercel --prod --yes` |
-| "점검해줘" | `node --check js/*.js scripts/*.js` → 4개 JSON 파싱 → serve.js 띄워 200 확인 → 결과 한 줄씩 |
+| "점검해줘" | `npm test`(lib.js 단위 테스트 12개) → `node --check js/*.js scripts/*.js` → 4개 JSON 파싱 → serve.js 띄워 200 확인 → 결과 한 줄씩 |
 | "되돌려줘" | 직전에 고친 파일을 원래대로. git이 있으면 `git checkout -- <파일>` 또는 `git revert HEAD`(커밋된 경우). 무엇을 되돌렸는지 한 줄 보고 |
 | "템플릿 업데이트 받아줘" | 원본 템플릿의 최신 ZIP을 받아 `index.html`·`js/`·`scripts/`·`.github/`·`SETUP.md`·`.claude/`만 교체. `data/`·`.env`·`.setup-progress.json`은 절대 건드리지 않는다. 교체 전 현재 것을 `.template-backup/`에 두고, 끝나면 무엇이 바뀌었는지 한 줄 보고 |
 

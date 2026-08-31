@@ -1,8 +1,12 @@
 # Vercel 에 올리지 않을 것 — 배포되는 건 index.html · js/ · data/ 뿐이다.
 # 수집·분석 스크립트와 키, 교체용 샘플, 문서는 웹에 있을 이유가 없다.
+# ⚠️ vercel.json 은 Vercel 이 직접 읽어야 하는 설정이라 여기 넣지 않는다(넣으면 보안 헤더가 통째로 사라진다).
 scripts/
 .env*
 sample/
 docs/
 .claude/
 .github/
+SETUP.md
+README.md
+package.json

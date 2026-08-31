@@ -81,7 +81,7 @@ Claude가 한다: `node scripts/serve.js`를 백그라운드로 실행 → 브�
 
 키가 오면 Claude가 한다: `.env`에 `SCRAPECREATORS_API_KEY=<값>` 기록(파일 없으면 `.env.example`을 복사해 만든다). 키 검증 — 프로필 조회 1회(`node -e`로 lib.js의 SC 래퍼를 불러 아무 공개 계정 하나 조회, 1크레딧). 응답에서 남은 크레딧을 읽어 말해준다.
 
-> 잘 됐어요. 무료 크레딧이 N개 남아 있어요. 한 달에 약 370개가 들어서, 무료로 더 받는 방법을 알려드릴게요 — ScrapeCreators 대시보드의 Bonus Credits(피드백 남기기·GitHub 스타 등, 최대 수천 개 무료). 지금 할까요, 세팅 끝나고 할까요?
+> 잘 됐어요. 무료 크레딧이 N개 남아 있어요. 이 대시보드는 월 약 370개를 씁니다. 가입 때 주는 무료 100개는 첫 주 분량이라, 무료로 더 받는 방법을 알려드릴게요 — ScrapeCreators 대시보드의 Bonus Credits(피드백 남기기·GitHub 스타·후기 등, 최대 7,000개 무료). 지금 할까요, 세팅 끝나고 할까요?
 
 검증: `.env`에 키 있음, 조회 200, 크레딧 잔량 숫자 확인. 진행 파일에 step=2.
 
@@ -265,7 +265,7 @@ Claude가 한다(사용자는 할 일 없음):
 
 | 증상 | 원인 | Claude가 하는 것 |
 |---|---|---|
-| 브라우저에 화면이 안 뜨고 "데이터 로딩 중" | JSON 파싱 오류 또는 캐시 | `python3 -c "import json; json.load(open('data/posts.json'))"`로 4개 파일 확인 → 시크릿 창으로 열기 안내 |
+| 브라우저에 화면이 안 뜨고 "데이터 로딩 중" | JSON 파싱 오류 또는 캐시 | `node -e "JSON.parse(require('fs').readFileSync('data/posts.json','utf8'));console.log('ok')"`로 4개 파일 확인 → 시크릿 창으로 열기 안내 |
 | 수집 0건 | 인스타 비공개 / 아이디 오타 / 크레딧 소진 | 3단계 막힐 때 참조. 크레딧이면 잔량 출력 |
 | 발굴 0건 | 소스 계정이 작아 기준(10만) 미달 | `settings.minViews`를 5만으로 낮춰 재실행 → 그래도 0건이면 `DISCOVER_MEDIAN_MULT=1`. 0건이어도 다음 단계로 |
 | SC `401` | 키 오타·공백 | 키 전체를 다시 복사받아 `.env` 재기록 |

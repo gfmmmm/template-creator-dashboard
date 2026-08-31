@@ -356,7 +356,7 @@ function renderDonut() {
   if (counts[PILLAR_FALLBACK]) {
     legend.appendChild(U.el('div', { class: 'dl-row' },
       '<span class="dl-sw" style="background:#9CA3AF"></span><span class="dl-nm">미분류</span>' +
-      `<span class="dl-track"></span><span class="dl-stat">${counts[PILLAR_FALLBACK]}개 · Claude에게 "기둥 다시 분류해줘"</span>`));
+      `<span class="dl-track"></span><span class="dl-stat">${counts[PILLAR_FALLBACK]}개 · Claude에게 "기둥 정해서 분류해줘"</span>`));
   }
   // 성과 콜아웃 — 개수와 성과의 괴리를 짚어준다
   const co = document.getElementById('pillarCallout');
