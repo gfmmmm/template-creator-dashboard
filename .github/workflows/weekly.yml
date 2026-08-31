@@ -1,0 +1,65 @@
+# 주간 갱신 — 내 계정 수집 → 레퍼런스 분석 → 내 릴스 코칭 → 기둥 분류 → 커밋
+# 매주 월요일 07:30 KST (= 일요일 22:30 UTC) · 손으로 돌리려면 Actions 탭 → Run workflow
+# 앞 단계가 실패해도 뒤 단계는 진행한다 — 한 곳이 막혔다고 그 주가 통째로 비면 안 된다.
+name: weekly
+
+on:
+  schedule:
+    - cron: "30 22 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-write
+  cancel-in-progress: false
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # npm install 없음 — 이 저장소는 의존성이 0이다
+
+      - name: 시크릿 확인
+        run: |
+          if [ -z "${{ secrets.SCRAPECREATORS_API_KEY }}" ]; then
+            echo "::notice::SCRAPECREATORS_API_KEY 시크릿이 없습니다 — 수집 단계를 건너뜁니다"
+          fi
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "::notice::GEMINI_API_KEY 시크릿이 없습니다 — 분석·코칭·분류 단계를 건너뜁니다"
+          fi
+
+      - name: 내 계정 수집
+        run: node scripts/collect.js
+
+      - name: 레퍼런스 분석
+        if: always()
+        run: node scripts/analyze.js
+
+      - name: 내 릴스 코칭
+        if: always()
+        run: node scripts/coach.js
+
+      - name: 기둥 분류
+        if: always()
+        run: node scripts/classify.js
+
+      - name: 커밋·푸시
+        if: always()
+        run: |
+          git config user.name "dashboard-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/posts.json data/discoveries.json data/analysis.json data/thumbs
+          git diff --cached --quiet && echo "바뀐 게 없습니다" && exit 0
+          git commit -m "자동: 주간 갱신 $(TZ=Asia/Seoul date +%F)"
+          git pull --rebase --autostash
+          git push

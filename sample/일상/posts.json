@@ -1,0 +1,76 @@
+{
+  "updatedAt": "2026-08-31T07:16:40.000Z",
+  "creditsRemaining": 23150,
+  "my": {
+    "profile": {
+      "handle": "daily_sample",
+      "fullName": "샘플 일상",
+      "biography": "자취 4년 차, 아직도 배우는 중\n요리 · 살림팁 · 6평 집꾸미기",
+      "externalUrl": "https://example.com/daily-sample",
+      "avatar": "data/thumbs/avatar_daily.svg",
+      "verified": false,
+      "followers": 15720,
+      "following": 389,
+      "postsCount": 103
+    },
+    "posts": [
+      {
+        "cardNo": "M-001", "shortcode": "DAILY0001", "url": "https://www.instagram.com/reel/DAILY0001/",
+        "owner": "daily_sample", "type": "reel",
+        "caption": "눌어붙은 냄비 10분이면 됩니다\n\n수세미로 문지르는 게 제일 늦는 방법이었어요.\n#살림팁 #자취",
+        "timestamp": "2026-08-28T18:20:00.000Z", "views": 240000, "likes": 12400, "comments": 380,
+        "thumb": "data/thumbs/DAILY0001.svg", "commerceHint": null,
+        "transcript": "눌어붙은 냄비, 수세미로 문지르지 마세요. 팔만 아프고 코팅만 나갑니다. 물을 냄비 바닥이 잠길 만큼 붓고 베이킹소다 한 숟갈 넣습니다. 그대로 5분만 끓이세요. 불 끄고 5분 더 두면 주걱으로 밀기만 해도 떨어집니다. 10분 동안 저는 다른 설거지를 합니다."
+      },
+      {
+        "cardNo": "M-002", "shortcode": "DAILY0002", "url": "https://www.instagram.com/reel/DAILY0002/",
+        "owner": "daily_sample", "type": "reel",
+        "caption": "재료값 4천원 자취 저녁\n\n계량 없이 눈대중으로 갑니다.\n#자취요리 #저녁메뉴",
+        "timestamp": "2026-08-21T19:00:00.000Z", "views": 118000, "likes": 7200, "comments": 260,
+        "thumb": "data/thumbs/DAILY0002.svg", "commerceHint": null,
+        "transcript": "오늘 재료값 사천원입니다. 애호박 하나, 계란 두 개, 남은 밥. 애호박을 얇게 썰어 소금 조금 뿌려두면 물이 나와요. 이 물을 짜고 볶아야 안 질척합니다. 계란은 따로 스크램블해서 마지막에 섞으세요. 같이 볶으면 밥이 뭉칩니다."
+      },
+      {
+        "cardNo": "M-003", "shortcode": "DAILY0003", "url": "https://www.instagram.com/p/DAILY0003/",
+        "owner": "daily_sample", "type": "carousel",
+        "caption": "6평 방 배치 3번 바꿔본 기록\n\n가구를 벽에 붙이는 게 항상 정답은 아니었어요.\n#집꾸미기 #원룸",
+        "timestamp": "2026-08-15T13:00:00.000Z", "views": 52000, "likes": 4100, "comments": 190,
+        "thumb": "data/thumbs/DAILY0003.svg", "commerceHint": null, "transcript": null
+      },
+      {
+        "cardNo": "M-004", "shortcode": "DAILY0004", "url": "https://www.instagram.com/reel/DAILY0004/",
+        "owner": "daily_sample", "type": "reel",
+        "caption": "장마철에 빨래 안 쉬게 하는 법\n\n건조기 없어도 됩니다.\n#살림팁 #장마",
+        "timestamp": "2026-08-07T11:10:00.000Z", "views": 176000, "likes": 9600, "comments": 310,
+        "thumb": "data/thumbs/DAILY0004.svg", "commerceHint": null,
+        "transcript": "장마철 빨래에서 냄새나는 건 덜 말라서가 아니라 널기 전에 이미 시작된 겁니다. 세탁 끝나고 30분 안에 꺼내세요. 그리고 널 때 옷 사이를 주먹 하나만큼 띄웁니다. 선풍기를 옷 아래에서 위로 쏘면 두 시간이 줄어요. 건조기 없어도 됩니다."
+      },
+      {
+        "cardNo": "M-005", "shortcode": "DAILY0005", "url": "https://www.instagram.com/p/DAILY0005/",
+        "owner": "daily_sample", "type": "carousel",
+        "caption": "주말에 만든 반찬 4가지 기록\n\n일요일 두 시간이면 한 주가 편해요.\n#주말기록 #밑반찬",
+        "timestamp": "2026-07-26T15:30:00.000Z", "views": 34000, "likes": 2800, "comments": 88,
+        "thumb": "data/thumbs/DAILY0005.svg", "commerceHint": null, "transcript": null
+      },
+      {
+        "cardNo": "M-006", "shortcode": "DAILY0006", "url": "https://www.instagram.com/reel/DAILY0006/",
+        "owner": "daily_sample", "type": "reel",
+        "caption": "1년 쓴 자취 필수템 공구합니다\n\n제가 매일 쓰는 것만 골랐어요. 일요일까지만 열어요.\n#공구 #자취템",
+        "timestamp": "2026-07-18T12:00:00.000Z", "views": 71000, "likes": 4300, "comments": 520,
+        "thumb": "data/thumbs/DAILY0006.svg", "commerceHint": "공구", "transcript": null
+      }
+    ]
+  },
+  "snapshots": [
+    { "date": "2026-08-22", "my": { "followers": 15102, "following": 384, "postsCount": 101, "totalViews": 668000, "avgViews": 6614 } },
+    { "date": "2026-08-23", "my": { "followers": 15168, "following": 384, "postsCount": 101, "totalViews": 674000, "avgViews": 6673 } },
+    { "date": "2026-08-24", "my": { "followers": 15221, "following": 385, "postsCount": 102, "totalViews": 679000, "avgViews": 6657 } },
+    { "date": "2026-08-25", "my": { "followers": 15264, "following": 385, "postsCount": 102, "totalViews": 683000, "avgViews": 6696 } },
+    { "date": "2026-08-26", "my": { "followers": 15301, "following": 386, "postsCount": 102, "totalViews": 687000, "avgViews": 6735 } },
+    { "date": "2026-08-27", "my": { "followers": 15352, "following": 387, "postsCount": 102, "totalViews": 691000, "avgViews": 6774 } },
+    { "date": "2026-08-28", "my": { "followers": 15489, "following": 387, "postsCount": 103, "totalViews": 702000, "avgViews": 6816 } },
+    { "date": "2026-08-29", "my": { "followers": 15618, "following": 388, "postsCount": 103, "totalViews": 712000, "avgViews": 6913 } },
+    { "date": "2026-08-30", "my": { "followers": 15681, "following": 388, "postsCount": 103, "totalViews": 718000, "avgViews": 6971 } },
+    { "date": "2026-08-31", "my": { "followers": 15720, "following": 389, "postsCount": 103, "totalViews": 723000, "avgViews": 7019 } }
+  ]
+}

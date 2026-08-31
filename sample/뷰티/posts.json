@@ -1,0 +1,76 @@
+{
+  "updatedAt": "2026-08-31T07:14:22.000Z",
+  "creditsRemaining": 19870,
+  "my": {
+    "profile": {
+      "handle": "beauty_sample",
+      "fullName": "샘플 뷰티",
+      "biography": "배운 적 없는 사람들의 화장 순서\n데일리 · 스킨케어 · 2주 써본 리뷰",
+      "externalUrl": "https://example.com/beauty-sample",
+      "avatar": "data/thumbs/avatar_beauty.svg",
+      "verified": false,
+      "followers": 8940,
+      "following": 214,
+      "postsCount": 61
+    },
+    "posts": [
+      {
+        "cardNo": "M-001", "shortcode": "BEAUTY0001", "url": "https://www.instagram.com/reel/BEAUTY0001/",
+        "owner": "beauty_sample", "type": "reel",
+        "caption": "쿠션이 뜨는 이유는 쿠션 탓이 아니었어요\n\n앞 단계 두 개만 바꿨습니다.\n#데일리메이크업 #쿠션",
+        "timestamp": "2026-08-27T11:00:00.000Z", "views": 152000, "likes": 8100, "comments": 290,
+        "thumb": "data/thumbs/BEAUTY0001.svg", "commerceHint": null,
+        "transcript": "쿠션이 뜨는 분들, 쿠션 바꾸지 마세요. 저도 세 개 바꿔봤는데 똑같았습니다. 문제는 앞 단계였어요. 첫째, 스킨을 손으로 두드려 흡수시킬 시간을 안 줬습니다. 30초만 기다리세요. 둘째, 선크림 위에 바로 올렸어요. 선크림이 마르기 전에 올리면 무조건 밀립니다. 이 두 가지만 고쳐도 지금 쓰는 쿠션 그대로 됩니다."
+      },
+      {
+        "cardNo": "M-002", "shortcode": "BEAUTY0002", "url": "https://www.instagram.com/reel/BEAUTY0002/",
+        "owner": "beauty_sample", "type": "reel",
+        "caption": "속건조 나는 사람 스킨케어 순서\n\n수분 크림을 마지막에 바르는 게 답이 아닙니다.\n#스킨케어 #속건조",
+        "timestamp": "2026-08-20T10:30:00.000Z", "views": 88000, "likes": 4600, "comments": 170,
+        "thumb": "data/thumbs/BEAUTY0002.svg", "commerceHint": null,
+        "transcript": "속건조는 물이 부족한 게 아니라 물이 새는 겁니다. 그래서 순서를 이렇게 바꿨어요. 세안 직후 물기가 남아 있을 때 토너를 바릅니다. 마른 얼굴에 바르면 이미 늦었어요. 그다음 가벼운 에센스, 마지막에 오일 한 방울로 덮습니다. 덮는 단계가 없으면 아무리 발라도 저녁에 당깁니다."
+      },
+      {
+        "cardNo": "M-003", "shortcode": "BEAUTY0003", "url": "https://www.instagram.com/p/BEAUTY0003/",
+        "owner": "beauty_sample", "type": "carousel",
+        "caption": "2주 써본 립 6개 솔직 순위\n\n협찬 아니고 제 돈으로 샀습니다.\n#립리뷰 #제품리뷰",
+        "timestamp": "2026-08-13T12:00:00.000Z", "views": 47000, "likes": 3400, "comments": 210,
+        "thumb": "data/thumbs/BEAUTY0003.svg", "commerceHint": null, "transcript": null
+      },
+      {
+        "cardNo": "M-004", "shortcode": "BEAUTY0004", "url": "https://www.instagram.com/reel/BEAUTY0004/",
+        "owner": "beauty_sample", "type": "reel",
+        "caption": "여름 트러블 났을 때 화장 덮는 법\n\n가리려고 두껍게 바르면 더 커집니다.\n#트러블 #커버메이크업",
+        "timestamp": "2026-08-05T09:40:00.000Z", "views": 121000, "likes": 6300, "comments": 240,
+        "thumb": "data/thumbs/BEAUTY0004.svg", "commerceHint": null,
+        "transcript": "트러블 났을 때 두껍게 덮으면 더 도드라집니다. 저는 반대로 합니다. 먼저 그 부위만 얇게 컨실러를 점처럼 올려요. 손가락 대신 브러시로 가장자리만 두드립니다. 그리고 파운데이션은 트러블 위가 아니라 주변부터 발라요. 마지막에 파우더를 그 자리에만 살짝. 덮는 게 아니라 눈에 안 걸리게 만드는 겁니다."
+      },
+      {
+        "cardNo": "M-005", "shortcode": "BEAUTY0005", "url": "https://www.instagram.com/p/BEAUTY0005/",
+        "owner": "beauty_sample", "type": "carousel",
+        "caption": "가을 데일리 색조 조합 공구합니다\n\n제가 직접 고른 4색 팔레트예요. 금요일까지만 열어요.\n#공구 #가을메이크업",
+        "timestamp": "2026-07-29T11:30:00.000Z", "views": 39000, "likes": 2900, "comments": 320,
+        "thumb": "data/thumbs/BEAUTY0005.svg", "commerceHint": "공구", "transcript": null
+      },
+      {
+        "cardNo": "M-006", "shortcode": "BEAUTY0006", "url": "https://www.instagram.com/reel/BEAUTY0006/",
+        "owner": "beauty_sample", "type": "reel",
+        "caption": "선크림 다시 바를 때 화장 안 무너지는 법\n\n제품 제공받아 촬영했습니다. #광고\n#선크림 #덧바르기",
+        "timestamp": "2026-07-21T10:00:00.000Z", "views": 64000, "likes": 3200, "comments": 130,
+        "thumb": "data/thumbs/BEAUTY0006.svg", "commerceHint": "광고", "transcript": null
+      }
+    ]
+  },
+  "snapshots": [
+    { "date": "2026-08-22", "my": { "followers": 8612, "following": 210, "postsCount": 59, "totalViews": 462000, "avgViews": 7830 } },
+    { "date": "2026-08-23", "my": { "followers": 8648, "following": 210, "postsCount": 59, "totalViews": 468000, "avgViews": 7932 } },
+    { "date": "2026-08-24", "my": { "followers": 8677, "following": 211, "postsCount": 60, "totalViews": 473000, "avgViews": 7883 } },
+    { "date": "2026-08-25", "my": { "followers": 8701, "following": 211, "postsCount": 60, "totalViews": 478000, "avgViews": 7966 } },
+    { "date": "2026-08-26", "my": { "followers": 8724, "following": 212, "postsCount": 60, "totalViews": 482000, "avgViews": 8033 } },
+    { "date": "2026-08-27", "my": { "followers": 8790, "following": 212, "postsCount": 61, "totalViews": 489000, "avgViews": 8016 } },
+    { "date": "2026-08-28", "my": { "followers": 8862, "following": 213, "postsCount": 61, "totalViews": 497000, "avgViews": 8147 } },
+    { "date": "2026-08-29", "my": { "followers": 8896, "following": 213, "postsCount": 61, "totalViews": 503000, "avgViews": 8245 } },
+    { "date": "2026-08-30", "my": { "followers": 8921, "following": 214, "postsCount": 61, "totalViews": 508000, "avgViews": 8327 } },
+    { "date": "2026-08-31", "my": { "followers": 8940, "following": 214, "postsCount": 61, "totalViews": 511000, "avgViews": 8377 } }
+  ]
+}
