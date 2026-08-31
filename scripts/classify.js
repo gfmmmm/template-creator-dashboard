@@ -9,13 +9,19 @@
 //  사용법: node scripts/classify.js
 //  환경  : GEMINI_API_KEY (없으면 안내 후 정상 종료)
 // ═══════════════════════════════════════════════════════════════════
-const { loadEnv, log, notice, needKey, readJson, writeJson, geminiText } = require('./lib.js');
+const { loadEnv, log, notice, needKey, readJson, writeJson, geminiText, isDemo } = require('./lib.js');
 
 async function main() {
   const env = loadEnv();
   const gkey = needKey(env, 'GEMINI_API_KEY', '기둥 분류');
 
-  const posts = readJson('posts.json', null)?.my?.posts || [];
+  const data = readJson('posts.json', null);
+  // 예시 데이터(demo:true)로는 분류하지 않는다 — 가짜 게시물에 기둥을 붙여봐야 첫 수집 때 다 지워진다.
+  if (isDemo(data)) {
+    notice('아직 예시 데이터뿐입니다 — 먼저 "데이터 가져와줘"로 내 계정을 수집하세요.');
+    process.exit(0);
+  }
+  const posts = data?.my?.posts || [];
   if (!posts.length) { log('내 게시물이 없습니다 — 먼저 node scripts/collect.js 를 돌리세요'); return; }
 
   const settings = readJson('settings.json') || {};

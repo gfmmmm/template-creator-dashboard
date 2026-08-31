@@ -17,7 +17,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const {
-  loadEnv, log, needKey, readJson, writeJson,
+  loadEnv, log, notice, needKey, readJson, writeJson, isDemo,
   scVideoUrl, commerceHintOf, downloadVideo, geminiAnalyze, geminiText,
   getCredits, median, limitOf,
 } = require('./lib.js');
@@ -123,6 +123,11 @@ async function main() {
   const sckey = needKey(env, 'SCRAPECREATORS_API_KEY', '내 릴스 코칭(영상 주소 확보)');
 
   const data = readJson('posts.json', null);
+  // 예시 데이터(demo:true)로는 코칭하지 않는다 — 가짜 영상 주소로 크레딧만 나간다.
+  if (isDemo(data)) {
+    notice('아직 예시 데이터뿐입니다 — 먼저 "데이터 가져와줘"로 내 계정을 수집하세요.');
+    process.exit(0);
+  }
   const posts = data?.my?.posts || [];
   if (!posts.length) { log('내 게시물이 없습니다 — 먼저 node scripts/collect.js 를 돌리세요'); return; }
 

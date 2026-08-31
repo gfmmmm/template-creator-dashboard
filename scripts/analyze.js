@@ -17,7 +17,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const {
-  loadEnv, log, needKey, readJson, writeJson,
+  loadEnv, log, notice, needKey, readJson, writeJson, isDemo,
   scVideoUrl, commerceHintOf, downloadVideo, geminiAnalyze, geminiText,
   getCredits, limitOf,
 } = require('./lib.js');
@@ -98,6 +98,12 @@ async function main() {
   const sckey = needKey(env, 'SCRAPECREATORS_API_KEY', '레퍼런스 분석(영상 주소 확보)');
 
   const db = readJson('discoveries.json', null);
+  // 예시 데이터(demo:true)로는 분석하지 않는다 — 가짜 주소로 영상을 받으러 가서 크레딧만 태우고,
+  // "영상을 못 찾았습니다"가 뜨면 처음 쓰는 사람은 자기 계정이 잘못된 줄 안다.
+  if (isDemo(db)) {
+    notice('아직 예시 데이터뿐입니다 — 먼저 "레퍼런스 발굴해줘"로 진짜 레퍼런스를 모으세요.');
+    process.exit(0);
+  }
   if (!db?.items?.length) { log('발굴된 레퍼런스가 없습니다 — 먼저 node scripts/discover.js 를 돌리세요'); return; }
 
   const settings = readJson('settings.json') || {};

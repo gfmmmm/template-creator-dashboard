@@ -11,7 +11,7 @@
 //  사용법: node scripts/brief.js
 //  환경  : GEMINI_API_KEY (없으면 안내 후 정상 종료)
 // ═══════════════════════════════════════════════════════════════════
-const { loadEnv, log, needKey, readJson, writeJson, geminiText } = require('./lib.js');
+const { loadEnv, log, notice, needKey, readJson, writeJson, geminiText, isDemo } = require('./lib.js');
 
 const SYSTEM = `너는 인스타그램 채널 브랜딩 전문가다. 주어진 계정 데이터(게시물·조회수·대본·코칭)를 종합해 이 채널의 "정체성"을 한국어로 정리한다.
 이 문서는 이 계정의 기획을 도울 때마다 참고하는 기준이 되므로, 실제 데이터에 근거해 구체적으로 써라.
@@ -30,6 +30,12 @@ async function main() {
   const gkey = needKey(env, 'GEMINI_API_KEY', '채널 정체성 분석');
 
   const data = readJson('posts.json', null);
+  // 예시 데이터(demo:true)로는 정체성을 뽑지 않는다.
+  // 여기서 안 막으면 예시 계정을 분석한 브리핑이 settings.brief 에 저장되고, 그건 사람 파일이라 수집이 덮어주지 않는다.
+  if (isDemo(data)) {
+    notice('아직 예시 데이터뿐입니다 — 먼저 "데이터 가져와줘"로 내 계정을 수집하세요.');
+    process.exit(0);
+  }
   const my = data?.my;
   if (!my?.posts?.length) { log('내 게시물이 없습니다 — 먼저 node scripts/collect.js 를 돌리세요'); return; }
 
