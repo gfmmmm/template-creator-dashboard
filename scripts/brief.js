@@ -27,15 +27,17 @@ const SYSTEM = `너는 인스타그램 채널 브랜딩 전문가다. 주어진 
 
 async function main() {
   const env = loadEnv();
-  const gkey = needKey(env, 'GEMINI_API_KEY', '채널 정체성 분석');
 
   const data = readJson('posts.json', null);
   // 예시 데이터(demo:true)로는 정체성을 뽑지 않는다.
   // 여기서 안 막으면 예시 계정을 분석한 브리핑이 settings.brief 에 저장되고, 그건 사람 파일이라 수집이 덮어주지 않는다.
+  // ⚠️ 키 검사(needKey)보다 앞이다 — 키가 없는 첫날엔 "키를 넣으세요"가 아니라 "수집이 먼저"가 맞는 안내다.
   if (isDemo(data)) {
     notice('아직 예시 데이터뿐입니다 — 먼저 "데이터 가져와줘"로 내 계정을 수집하세요.');
     process.exit(0);
   }
+
+  const gkey = needKey(env, 'GEMINI_API_KEY', '채널 정체성 분석');
   const my = data?.my;
   if (!my?.posts?.length) { log('내 게시물이 없습니다 — 먼저 node scripts/collect.js 를 돌리세요'); return; }
 

@@ -119,15 +119,17 @@ function guardCoach(an) {
 
 async function main() {
   const env = loadEnv();
-  const gkey = needKey(env, 'GEMINI_API_KEY', '내 릴스 코칭');
-  const sckey = needKey(env, 'SCRAPECREATORS_API_KEY', '내 릴스 코칭(영상 주소 확보)');
 
   const data = readJson('posts.json', null);
   // 예시 데이터(demo:true)로는 코칭하지 않는다 — 가짜 영상 주소로 크레딧만 나간다.
+  // ⚠️ 키 검사(needKey)보다 앞이다 — 키가 없는 첫날엔 "키를 넣으세요"가 아니라 "수집이 먼저"가 맞는 안내다.
   if (isDemo(data)) {
     notice('아직 예시 데이터뿐입니다 — 먼저 "데이터 가져와줘"로 내 계정을 수집하세요.');
     process.exit(0);
   }
+
+  const gkey = needKey(env, 'GEMINI_API_KEY', '내 릴스 코칭');
+  const sckey = needKey(env, 'SCRAPECREATORS_API_KEY', '내 릴스 코칭(영상 주소 확보)');
   const posts = data?.my?.posts || [];
   if (!posts.length) { log('내 게시물이 없습니다 — 먼저 node scripts/collect.js 를 돌리세요'); return; }
 

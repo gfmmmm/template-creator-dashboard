@@ -247,6 +247,10 @@ async function scReels(handle, key, { limit = 30, sinceMs = null, maxPages = nul
     try {
       json = await sc(q, key, `릴스 @${handle} p${page + 1}`);
     } catch (e) {
+      // ⚠️ 첫 페이지 실패는 삼키지 않는다.
+      //    여기서 []를 돌려주면 키가 틀렸거나 크레딧이 0인 날에도 호출부가 "신규 0건"으로 초록불을 켠다.
+      //    (실제로 그 구멍 때문에 401 이 며칠간 정상 종료로 보고됐다)
+      if (page === 0) throw e;
       // 뒷페이지가 실패해도 앞에서 받은 건 살린다
       log(`  ⚠️ @${handle} p${page + 1} 포기 — 여기까지 ${out.length}건 유지: ${String(e.message).slice(0, 90)}`);
       break;

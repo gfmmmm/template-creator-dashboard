@@ -13,21 +13,23 @@ const { loadEnv, log, notice, needKey, readJson, writeJson, geminiText, isDemo }
 
 async function main() {
   const env = loadEnv();
-  const gkey = needKey(env, 'GEMINI_API_KEY', '기둥 분류');
 
   const data = readJson('posts.json', null);
   // 예시 데이터(demo:true)로는 분류하지 않는다 — 가짜 게시물에 기둥을 붙여봐야 첫 수집 때 다 지워진다.
+  // ⚠️ 키 검사(needKey)보다 앞이다 — 키가 없는 첫날엔 "키를 넣으세요"가 아니라 "수집이 먼저"가 맞는 안내다.
   if (isDemo(data)) {
     notice('아직 예시 데이터뿐입니다 — 먼저 "데이터 가져와줘"로 내 계정을 수집하세요.');
     process.exit(0);
   }
+
+  const gkey = needKey(env, 'GEMINI_API_KEY', '기둥 분류');
   const posts = data?.my?.posts || [];
   if (!posts.length) { log('내 게시물이 없습니다 — 먼저 node scripts/collect.js 를 돌리세요'); return; }
 
   const settings = readJson('settings.json') || {};
   const pillars = (settings.pillars || []).map((p) => p.name).filter(Boolean);
   if (!pillars.length) {
-    notice('data/settings.json 에 콘텐츠 기둥이 없어서 분류를 건너뜁니다. ("기둥 4개 정해서 분류해줘")');
+    notice('data/settings.json 에 콘텐츠 기둥이 없어서 분류를 건너뜁니다. ("기둥 정해서 분류해줘")');
     process.exit(0);
   }
 
