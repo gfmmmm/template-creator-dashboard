@@ -229,8 +229,8 @@ td.active{font-weight:700;color:var(--accent)}
 .dcard .dbadge.wait{background:rgba(20,21,33,.6);color:#fff}
 .dcard .dcom{position:absolute;top:8px;right:8px;font-size:13px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 .dcard .dtopic{padding:9px 11px;font-size:11.5px;font-weight:700;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:3.6em}
-.thr-input{width:54px;border:none;background:transparent;color:inherit;font:inherit;font-weight:800;text-align:right;outline:none;-moz-appearance:textfield}
-.thr-input::-webkit-outer-spin-button,.thr-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+/* 발굴 기준 조회수 칸 — type="text" + inputmode="numeric" 이라 화살표·휠 조작 자체가 없다(스핀버튼 CSS 불필요) */
+.thr-input{width:54px;border:none;background:transparent;color:inherit;font:inherit;font-weight:800;text-align:right;outline:none}
 
 /* ── 모달 ── */
 #modal{position:fixed;inset:0;background:rgba(20,21,33,.55);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
@@ -421,6 +421,7 @@ td.active{font-weight:700;color:var(--accent)}
     <div id="discInfo"></div>
     <div class="lens-row" style="margin-top:0">
       <span class="filter-label">조회수</span><span class="chips seg" id="discViews"></span>
+      <span class="filter-label" style="margin-left:6px">정렬</span><span class="chips seg" id="discSort"></span>
       <span class="filter-label" style="margin-left:6px">상업콘텐츠</span><span class="chips seg" id="discCommerce"></span>
       <span id="discComNote" style="font-size:11.5px;color:var(--muted)"></span>
       <input id="discSearch" type="search" placeholder="캡션·대본 검색…" style="margin-left:auto">

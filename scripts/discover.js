@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   loadEnv, log, notice, needKey, readJson, writeJson, THUMBS,
-  scReels, scTranscript, downloadThumb, getCredits, pad3, median, limitOf, freshIfDemo, isDemo,
+  scProfile, scReels, scTranscript, downloadThumb, getCredits, pad3, median, limitOf, freshIfDemo, isDemo,
 } = require('./lib.js');
 
 const FIRST_DAYS = limitOf('DISCOVER_FIRST_DAYS', 90);   // 첫 수집: 3개월 백필
@@ -66,6 +66,30 @@ async function main() {
     const state = db.sourceState[handle] || {};
     const firstTime = !state.lastCollectedAt;
     const cutoff = Date.now() - (firstTime ? FIRST_DAYS : REGULAR_DAYS) * 86400000;
+
+    // 새로 등록한 소스는 프로필을 한 번 실조회해 사람이 눈으로 확인할 수 있게 찍는다(1크레딧).
+    // 아이디 오타가 '없는 계정'이 아니라 '실존하는 남의 계정'을 가리키면, 그 사람 릴스가
+    // 아무 경고 없이 내 레퍼런스로 섞여 들어온다. 두 번째 실행부터는 다시 부르지 않는다.
+    if (firstTime) {
+      try {
+        const prof = await scProfile(handle, key);
+        log(`  ✅ 소스 등록 확인 @${prof.handle || handle} · 표시명 "${prof.fullName || '(없음)'}"`
+          + ` · 팔로워 ${prof.followers ?? '?'}명 · 게시물 ${prof.postsCount ?? '?'}건`
+          + ` — 이 계정이 맞나요?`);
+        if (prof.isPrivate) log(`  ⚠️ @${handle} 은 비공개 계정이라 릴스를 가져올 수 없습니다`);
+        else if (!prof.postsCount) log(`  ⚠️ @${handle} 게시물이 0건입니다 — 아이디 오타일 수 있어요`);
+      } catch (e) {
+        const msg = String(e.message || e);
+        if (isKeyOrCreditError(msg)) {
+          console.error(`\n❌ ScrapeCreators 키가 틀렸거나 크레딧이 0입니다 — .env 의 SCRAPECREATORS_API_KEY 와 남은 크레딧을 확인하세요`);
+          console.error(`   (응답: ${msg.slice(0, 120)})\n`);
+          process.exit(1);
+        }
+        // 프로필 조회만 실패했다고 수집을 접지는 않는다 — 확인 문구를 못 낸 것뿐이다
+        log(`  ⚠️ @${handle} 프로필 확인 실패(수집은 계속): ${msg.slice(0, 70)}`);
+      }
+    }
+
     let reels = [];
     try { reels = await scReels(handle, key, { limit: 12, sinceMs: cutoff, maxPages: MAX_PAGES }); }
     catch (e) {
@@ -147,16 +171,21 @@ async function main() {
       analyzedAt: null,
     });
   }
-  if (fresh.length) log(`썸네일 ${okThumb}/${fresh.length}`);
+  if (fresh.length) {
+    log(`썸네일 ${okThumb}/${fresh.length}`);
+    // 실패분은 만료될 외부 CDN 주소를 적어두지 않고 thumb=null 로 둔다 — 화면은 🎬 로 폴백한다
+    if (okThumb < fresh.length) log(`  ⚠️ 썸네일 ${fresh.length - okThumb}건은 못 받아 카드에 🎬 로 표시됩니다`);
+  }
 
-  // 보관 상한 — 오래된 것부터 덜어낸다(썸네일 파일도 함께 지워 저장소를 가볍게 유지)
+  // 보관 상한 — 오래된 것부터 덜어낸다(썸네일 파일도 함께 지워 저장소를 가볍게 유지).
+  // ⚠️ 순서가 중요하다: 파일을 먼저 지우고 JSON 을 나중에 쓰면, 그 사이에 프로세스가 죽었을 때
+  //    JSON 은 아직 그 항목들을 가리키는데 그림만 사라져 카드가 통째로 깨진다.
+  //    "JSON 먼저 쓰고 → 더 이상 아무도 안 가리키는 파일을 지운다" 로 두면 최악이 '고아 파일 잔존'(무해)이다.
+  let orphanThumbs = [];
   if (db.items.length > MAX_ITEMS) {
     const keep = [...db.items].sort((a, b) => String(b.takenAt || '').localeCompare(String(a.takenAt || ''))).slice(0, MAX_ITEMS);
     const keepSet = new Set(keep.map((x) => x.shortcode));
-    for (const x of db.items) {
-      if (keepSet.has(x.shortcode)) continue;
-      try { fs.unlinkSync(path.join(THUMBS, `r_${x.shortcode}.jpg`)); } catch { /* 이미 없음 */ }
-    }
+    orphanThumbs = db.items.filter((x) => !keepSet.has(x.shortcode)).map((x) => `r_${x.shortcode}.jpg`);
     log(`보관 상한 ${MAX_ITEMS}건 — 오래된 ${db.items.length - keep.length}건 정리`);
     db.items = keep;
   }
@@ -168,7 +197,12 @@ async function main() {
 
   db.updatedAt = new Date().toISOString();
   db.creditsRemaining = getCredits();
-  writeJson('discoveries.json', db);
+  writeJson('discoveries.json', db); // 임시파일 → rename 이라 반쪽 JSON 이 남지 않는다(lib.js writeJson)
+
+  // 이제 JSON 에서 사라진 것들의 썸네일만 지운다 — 여기서 죽어도 남는 건 안 쓰이는 파일뿐이다
+  for (const name of orphanThumbs) {
+    try { fs.unlinkSync(path.join(THUMBS, name)); } catch { /* 이미 없음 */ }
+  }
 
   const analyzed = db.items.filter((x) => x.status === 'analyzed').length;
   console.log(`\n✅ 신규 ${fresh.length}건 · 보관 ${db.items.length}건(분석 완료 ${analyzed}) · 남은 크레딧 ${getCredits() ?? '?'}`);

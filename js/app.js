@@ -14,7 +14,7 @@ const S = {
   // 내 계정 라이브러리 필터
   F: { q: '', fmt: 'all', pillar: 'all', lens: 'views', view: 'gallery', commerce: 'all' },
   // 레퍼런스 탭 필터
-  D: { q: '', commerce: 'all', views: 'thr', thr: null, editThr: false },
+  D: { q: '', commerce: 'all', views: 'thr', thr: null, editThr: false, sort: 'views' },
   T: { metric: 'followers' },      // 추이 카드 렌즈
   P: null,                          // 기둥 도넛 기간 (YYYY-MM | 'all')
   _donutSelected: null,
@@ -49,6 +49,37 @@ const cssUrl = (u) => {
 // 인스타 shortcode — 임베드 주소에 끼우기 전 형식 검증. 경로 탈출(/, ?, #) 차단.
 const safeShortcode = (s) => (/^[A-Za-z0-9_-]{1,64}$/.test(String(s || '')) ? String(s) : '');
 
+// ── 순수 로직 (DOM 을 안 건드린다) ────────────────────────────
+// 이 블록은 `scripts/test/app-pure.test.js` 가 파일에서 그대로 떼어내 Node 에서 검증한다.
+// 아래 두 표식 줄은 테스트가 찾는 경계라서 지우거나 문구를 바꾸면 안 된다.
+// PURE-BLOCK-START
+// 그 날짜가 속한 달의 키(YYYY-MM). 반드시 브라우저 로컬 시각 기준이다.
+// toISOString() 은 UTC 로 바꿔버려서, 한국시간 매월 1일 00~09시에 "이번 달"이 지난달로 찍혔다.
+// (게시물 timestamp 는 ISO 문자열을 slice 해 쓰므로 그쪽과 맞추려면 이 함수도 같은 달력을 봐야 한다)
+function monthKeyLocal(d) {
+  const t = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(t.getTime())) return '';
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// 숫자만 받는 칸의 정규화 — 숫자 아닌 글자를 버리고, 앞에 붙은 0 을 없앤다("007" → "7").
+// type="number" 를 안 쓰는 이유: 스크롤 휠에 값이 조용히 바뀌고, 0 접두가 그대로 남는다.
+function normalizeNumInput(v) {
+  return String(v == null ? '' : v).replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
+}
+
+// 발굴 정렬의 '최신 가중' 점수 — 조회수에 나이 감쇠를 곱한다(반감기 45일).
+// 순수 조회수 정렬만 있으면 몇 년 전 대박 릴스가 상단을 영구 점유해 새 레퍼런스가 안 보인다.
+// 기본(조회순)은 그대로 두고 렌즈 하나를 더한 것이다. 날짜를 모르는 항목은 맨 뒤로 보낸다.
+const RECENCY_HALF_LIFE_DAYS = 45;
+function recencyScore(views, takenAt, now) {
+  const t = Date.parse(takenAt || '');
+  if (!Number.isFinite(t)) return 0;
+  const ageDays = Math.max(0, (now - t) / 86400000);
+  return (Number(views) || 0) * Math.pow(0.5, ageDays / RECENCY_HALF_LIFE_DAYS);
+}
+// PURE-BLOCK-END
+
 // ───────────────────────── 공용 계산 ─────────────────────────
 const myPosts = () => S.posts.my.posts || [];
 const snapshots = () => S.posts.snapshots || [];
@@ -66,6 +97,8 @@ const pillarColor = (name) => {
   return i >= 0 ? PILLAR_COLORS[i % PILLAR_COLORS.length] : '#9CA3AF';
 };
 // 기둥 3단 우선순위: settings.overrides → analysis.pillars → 미분류
+// ⚠️ 같은 우선순위가 `scripts/coach.js` 의 buildCtx() 에도 한 벌 더 있다(브라우저는 require 를 못 쓴다).
+//    한쪽만 고치면 화면에 보이는 기둥과 코칭이 참고한 기둥이 갈라진다 — 둘을 같이 고칠 것.
 function pillarOf(post) {
   const o = (S.settings.overrides || {})[post.shortcode];
   // 수동 교정이 현재 기둥 목록에 없으면(기둥을 지운 뒤) 자동 분류로 폴백 — 게시물이 화면에서 사라지지 않게
@@ -74,7 +107,9 @@ function pillarOf(post) {
 }
 
 // ── 상업성 3단 우선순위: settings.commerceOverrides → commerceHint → 정규식 ──
-// ⚠️ 규칙을 바꾸면 scripts/lib.js 의 commerceHintOf 규칙도 같이 바꿀 것 (원문 캡션 기준 판정용 사본)
+// ⚠️ 짝은 `scripts/lib.js` 의 COMMERCE_AD_RE / COMMERCE_SELL_RE 다(원문 캡션 기준 판정용 사본).
+//    한 벌만 고치면 화면과 데이터가 갈라지므로, 두 벌이 글자 단위로 같은지를
+//    `scripts/test/app-sync.test.js` 가 매 테스트마다 대조한다 — 규칙을 바꾸면 양쪽을 같이 고칠 것.
 const COMMERCE_AD = /#\s?(광고|협찬)|#AD\b|유료\s*광고|제작\s*지원|협찬\s*받|제공\s*받|paid\s*partnership/i;
 const COMMERCE_SELL = /공구|공동\s*구매|스마트\s*스토어|프로필\s*링크|구매\s*링크|와디즈|펀딩|마감\s*임박/;
 const COMMERCE_BADGE = { '공구': '🛒', '광고': '📢' };
@@ -154,6 +189,12 @@ async function boot() {
   }
   S.settings = Object.assign({ pillars: [], sources: [], overrides: {}, commerceOverrides: {}, hidden: [], minViews: DEFAULT_MIN_VIEWS }, settings);
   S.posts = posts;
+  // ⚠️ "못 읽었다"와 "아직 없다"는 다른 사건이다. 빈 껍데기로 바꿔치우면 화면에는 둘 다
+  //    "발굴 0건"으로 보여, 파일이 깨지거나 배포가 반쪽인 날에도 아무도 못 알아챈다.
+  //    settings·posts 는 치명(위에서 중단)이고, 이 둘은 나머지 화면을 살리되 사실을 밝힌다.
+  S._loadFailed = [];
+  if (!disc) S._loadFailed.push('레퍼런스(data/discoveries.json)');
+  if (!analysis) S._loadFailed.push('분석·코칭(data/analysis.json)');
   S.disc = disc || { items: [] };
   S.analysis = analysis || { pillars: {}, coaching: {} };
   S.posts.snapshots = (posts.snapshots || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -163,7 +204,12 @@ async function boot() {
   try {
     renderAll();
     route();
-    if (bn) bn.remove();
+    // 일부 파일을 못 읽었으면 안내를 남긴다 — 지우면 "원래 비어 있는 화면"과 구분이 사라진다
+    if (bn && S._loadFailed.length) {
+      bn.innerHTML = `⚠️ ${U.esc(S._loadFailed.join(' · '))} 파일을 불러오지 못했어요.<br>` +
+        '그 부분이 비어 보이는 건 <b>데이터가 없어서가 아니라 못 읽어서</b>입니다 — ' +
+        'Claude에게 <b>"점검해줘"</b>라고 말씀해 주세요.';
+    } else if (bn) bn.remove();
   } catch (e) {
     console.error('[대시보드] 화면을 그리다 멈췄어요', e);
     if (bn) {
@@ -267,7 +313,7 @@ function renderProfileHeader() {
 function pillarPeriodList() {
   // 전체(가장 넓음) → 오래된 달 → 최신 달 순. 왼쪽 화살표=과거, 오른쪽=최신
   const months = [...new Set(myPosts().map((p) => String(p.timestamp).slice(0, 7)))].sort();
-  const thisM = new Date().toISOString().slice(0, 7);
+  const thisM = monthKeyLocal(new Date()); // 로컬(한국) 달력 기준 — UTC 로 바꾸면 매월 1일 새벽에 지난달로 찍힌다
   const label = (m) => (m === thisM ? `이번 달 (${Number(m.slice(5))}월)` : `${m.slice(0, 4)}년 ${Number(m.slice(5))}월`);
   return [{ value: 'all', label: '전체 기간' }, ...months.map((m) => ({ value: m, label: label(m) }))];
 }
@@ -840,7 +886,11 @@ function renderDiscover() {
 
   const all = discItems().filter((d) => !isHidden(d));
   if (!all.length) {
-    root.innerHTML = '<div class="empty-note" style="text-align:left;padding:18px;line-height:1.7">아직 발굴된 릴스가 없어요.<br>Claude에게 <b>"소스 계정으로 @아이디 등록해줘"</b> → <b>"레퍼런스 가져와줘"</b>라고 말씀해 주세요.</div>';
+    // 파일을 못 읽은 것과 아직 0건인 것을 다른 문장으로 — 같은 빈 화면으로 뭉뚱그리지 않는다
+    const failed = (S._loadFailed || []).some((f) => f.includes('discoveries'));
+    root.innerHTML = failed
+      ? '<div class="empty-note" style="text-align:left;padding:18px;line-height:1.7">⚠️ 레퍼런스 파일(data/discoveries.json)을 <b>불러오지 못했어요</b>.<br>발굴이 0건인 게 아니라 파일을 못 읽은 상태예요 — Claude에게 <b>"점검해줘"</b>라고 말씀해 주세요.</div>'
+      : '<div class="empty-note" style="text-align:left;padding:18px;line-height:1.7">아직 발굴된 릴스가 없어요.<br>Claude에게 <b>"소스 계정으로 @아이디 등록해줘"</b> → <b>"레퍼런스 가져와줘"</b>라고 말씀해 주세요.</div>';
     return;
   }
 
@@ -860,12 +910,23 @@ function renderDiscover() {
       onclick: () => { S.D.views = 'all'; renderDiscover(); },
     }, `전체 ${all.length}`));
     if (S.D.editThr) {
-      const inp = U.el('input', { type: 'number', value: thr, min: '1', class: 'thr-input' });
+      // type="number" 가 아니라 text + inputmode="numeric" 이다.
+      //  · 숫자 칸 위에서 페이지를 스크롤하면 값이 조용히 바뀌는 사고가 원천 차단된다(휠 가드가 필요 없어진다)
+      //  · "007" 같은 0 접두가 남지 않는다 — 입력 즉시 normalizeNumInput 으로 정리한다
+      //  · 폰에서는 inputmode 덕에 여전히 숫자 키패드가 뜬다
+      const inp = U.el('input', {
+        type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '6',
+        value: String(thr), class: 'thr-input', 'aria-label': '발굴 기준 조회수(만)',
+      });
+      inp.addEventListener('input', () => {
+        const n = normalizeNumInput(inp.value);
+        if (inp.value !== n) inp.value = n; // 숫자 아닌 글자·0 접두는 그 자리에서 지운다
+      });
       let applied = false;
       const apply = () => {
         if (applied) return;
         applied = true;
-        const v = Math.max(1, Math.round(Number(inp.value) || thr));
+        const v = Math.max(1, Number(normalizeNumInput(inp.value)) || thr);
         S.D.thr = v;
         try { localStorage.setItem('discThr', v); } catch { /* 시크릿 모드 등 */ }
         S.D.editThr = false; S.D.views = 'thr';
@@ -908,9 +969,28 @@ function renderDiscover() {
   const q = S.D.q.toLowerCase();
   if (q) items = items.filter((d) => ((d.caption || '') + ' ' + (d.transcript || '') + ' ' + (d.analysis?.주제 || '')).toLowerCase().includes(q));
 
-  // 한 계정 도배 방지 — 조회수순은 유지하되 같은 계정이 연속 2장을 넘으면 뒤로 민다.
+  // 정렬 렌즈 — 기본은 조회순 그대로. '최신 가중'은 조회수에 나이 감쇠를 곱해
+  // 오래된 대박 릴스가 상단을 영구 점유하는 것을 푼다(화면에 저장하는 버튼은 없다 — 이 브라우저 안에서만).
+  const dsRoot = document.getElementById('discSort');
+  if (dsRoot) {
+    dsRoot.innerHTML = '';
+    for (const [k, label, tip] of [
+      ['views', '조회순', '조회수가 높은 순'],
+      ['recent', '최신 가중', '조회수 × 최신성 — 반감기 45일로, 오래된 대박 릴스는 서서히 내려갑니다'],
+    ]) {
+      dsRoot.appendChild(U.el('button', {
+        class: 'chip' + (S.D.sort === k ? ' on' : ''), title: tip,
+        onclick: () => { S.D.sort = k; renderDiscover(); },
+      }, label));
+    }
+  }
+
+  // 한 계정 도배 방지 — 위 정렬은 유지하되 같은 계정이 연속 2장을 넘으면 뒤로 민다.
   // 대형 계정은 릴스 대부분이 상위권이라 절대 조회수 정렬만으론 그리드를 점령한다.
-  let shown = [...items].sort((a, b) => (b.views || 0) - (a.views || 0));
+  const nowMs = Date.now();
+  let shown = S.D.sort === 'recent'
+    ? [...items].sort((a, b) => recencyScore(b.views, b.takenAt, nowMs) - recencyScore(a.views, a.takenAt, nowMs))
+    : [...items].sort((a, b) => (b.views || 0) - (a.views || 0));
   {
     const pool = [...shown]; const out = [];
     let last = null, run = 0;

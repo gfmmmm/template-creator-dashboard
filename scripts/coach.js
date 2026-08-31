@@ -24,6 +24,12 @@ const {
 
 const COACH_MAX = limitOf('COACH_MAX', 5);
 const MAX_FAILS = 3;
+
+// 이 파일의 코칭 프롬프트를 고칠 때마다 날짜를 올린다. 결과에 같이 적히므로,
+// 나중에 "옛 프롬프트로 만든 코칭만 다시 받자"를 고를 수 있다.
+// (소급 재코칭 자체는 아직 구현하지 않았다 — 대상을 고를 근거만 남긴다.
+//  다시 돌리려면 analysis.json 의 coaching 에서 그 shortcode 를 지우면 이 스크립트가 다시 집는다)
+const PROMPT_VERSION = '2026-09-01';
 const TMP = path.join(os.tmpdir(), 'creator-dashboard-mine');
 
 // 코칭 공통 재료 — 계정 정체성·기둥·잘 됐던 영상. 전 릴스가 함께 쓴다.
@@ -34,7 +40,9 @@ function buildCtx(posts, settings, analysis) {
   const line = (p) => `· 「${(p.caption || '').split('\n')[0].slice(0, 40)}」 — ${Math.round((p.views || 0) / 10000)}만 뷰 (평소의 ${med > 0 ? (p.views / med).toFixed(0) : '?'}배)`;
   const sorted = [...posts].filter((p) => p.views != null).sort((a, b) => b.views - a.views);
   const top = sorted.slice(0, 2).map(line);
-  // 기둥 분류: 수동 교정(settings.overrides)이 AI 분류(analysis.pillars)보다 우선
+  // 기둥 분류: 수동 교정(settings.overrides)이 AI 분류(analysis.pillars)보다 우선.
+  // ⚠️ 같은 우선순위가 화면 쪽 `js/app.js` 의 pillarOf() 에도 한 벌 더 있다(브라우저는 require 를 못 쓴다).
+  //    한쪽만 고치면 대시보드에 보이는 기둥과 코칭이 참고한 기둥이 갈라진다 — 둘을 같이 고칠 것.
   const cls = { ...(analysis.pillars || {}), ...(settings.overrides || {}) };
   const byPillar = {};
   for (const p of sorted) {
@@ -158,7 +166,12 @@ async function main() {
       if (!await downloadVideo(url, vid)) { log(`  ⚠️ ${post.cardNo || post.shortcode} 영상 내려받기 실패`); continue; }
       const va = await geminiAnalyze(vid, gkey);
       const an = guardCoach(await coach(post, va, data.my?.avgViews, data.my?.handle, ctx, gkey));
-      analysis.coaching[post.shortcode] = { video_analysis: va, analysis: an, analyzed_at: new Date().toISOString() };
+      analysis.coaching[post.shortcode] = {
+        video_analysis: va,
+        analysis: an,
+        analyzed_at: new Date().toISOString(),
+        prompt_version: PROMPT_VERSION, // 어느 프롬프트로 만든 코칭인지 (소급 재코칭 대상 고르기용)
+      };
       delete analysis.coachFails[post.shortcode];
       done++;
       log(`  ✅ ${post.cardNo || post.shortcode} (${Math.round((post.views || 0) / 10000)}만) — ${an.한줄평 || ''}`);

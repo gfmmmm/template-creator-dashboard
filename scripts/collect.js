@@ -47,10 +47,14 @@ async function main() {
   const prev = freshIfDemo(prevRaw, { my: { posts: [] }, snapshots: [] });
   const prevPosts = prev?.my?.posts || [];
 
-  // 1) 프로필
+  // 1) 프로필 — 등록한 아이디가 정말 그 사람인지 사람이 눈으로 확인할 수 있게 한 줄로 찍는다.
+  //    오타 아이디가 '없는 계정'이면 여기서 4xx 로 끊기지만, '실존하는 남의 계정'이면
+  //    아무 경고 없이 남의 데이터가 내 대시보드로 들어온다. 표시명·팔로워·게시물 수가 그 방어선이다.
   const profile = await scProfile(handle, key);
+  log(`✅ 계정 확인 @${profile.handle || handle} · 표시명 "${profile.fullName || '(없음)'}"`
+    + ` · 팔로워 ${profile.followers ?? '?'}명 · 게시물 ${profile.postsCount ?? '?'}건 — 이 계정이 맞나요?`);
   if (profile.isPrivate) log(`  ⚠️ @${handle} 이 비공개 계정입니다 — 게시물을 가져올 수 없습니다`);
-  log(`프로필 @${profile.handle} · 팔로워 ${profile.followers ?? '?'} · 게시물 ${profile.postsCount ?? '?'}`);
+  else if (!profile.postsCount) log(`  ⚠️ @${handle} 게시물이 0건입니다 — 아이디 오타일 수 있어요`);
 
   // 2) 릴스 전부
   const posts = await scReels(handle, key, { limit: (profile.postsCount || 50) + 10 });

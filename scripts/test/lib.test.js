@@ -104,6 +104,23 @@ test('cutSafe: 반쪽 이모지를 남기지 않는다', () => {
   assert.equal(L.cutSafe(null, 5), '');
 });
 
+test('extractJson: 실패를 조용히 넘기지 않는다 (표시 + 시각)', () => {
+  assert.deepEqual(L.extractJson('앞말 {"a":1} 뒷말'), { a: 1 }, '앞뒤에 말이 붙어도 JSON 만 꺼낸다');
+  const bad = L.extractJson('죄송합니다, JSON 으로 못 드리겠어요');
+  assert.equal(bad.parseFailed, true, '파싱 실패는 반드시 표시가 남아야 재시도·소급 대상이 된다');
+  assert.ok(/^\d{4}-\d{2}-\d{2}T/.test(bad.parseFailedAt), '언제 실패했는지 시각도 남는다');
+  assert.ok(bad.raw.includes('죄송합니다'), '원문 일부는 확인용으로 남긴다');
+  assert.equal(L.extractJson('').parseFailed, true, '빈 응답도 실패다');
+});
+
+test('candidateText: thought 파트를 건너뛰고 나머지 text 를 잇는다', () => {
+  // parts[0] 고정 인덱스로 읽으면 모델이 생각 파트를 앞에 얹은 날 빈 문자열을 받는다
+  assert.equal(L.candidateText({ content: { parts: [{ text: '속으로 생각', thought: true }, { text: '{"a":1}' }] } }), '{"a":1}');
+  assert.equal(L.candidateText({ content: { parts: [{ text: '앞' }, { text: '뒤' }] } }), '앞뒤');
+  assert.equal(L.candidateText({ content: { parts: [{ functionCall: {} }] } }), '', '텍스트가 없으면 빈 문자열');
+  assert.equal(L.candidateText(undefined), '', 'candidates 가 아예 없어도 터지지 않는다');
+});
+
 test('limitOf: 없으면 기본값 · 빈 문자열도 기본값 · 오타는 0', () => {
   delete process.env.__TEST_LIMIT__;
   assert.equal(L.limitOf('__TEST_LIMIT__', 10), 10);

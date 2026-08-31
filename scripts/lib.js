@@ -130,7 +130,9 @@ async function sc(pathname, key, label = '', tries = 3) {
 }
 
 // 상업성 힌트 — 원문 캡션 기준 공구/광고 판정.
-// ⚠️ 규칙을 바꾸면 js/app.js 의 같은 정규식도 함께 바꿔야 화면과 데이터가 어긋나지 않는다.
+// ⚠️ 한 벌만 고치면 화면과 데이터가 갈라진다. 짝은 `js/app.js` 의 COMMERCE_AD / COMMERCE_SELL 이고,
+//    두 벌이 글자 단위로 같은지는 `scripts/test/app-sync.test.js` 가 매 테스트마다 대조한다
+//    (브라우저는 require 를 못 쓰고 이 저장소는 빌드가 없어서 한 곳에 둘 수 없다 — 대신 테스트로 묶었다).
 const COMMERCE_AD_RE = /#\s?(광고|협찬)|#AD\b|유료\s*광고|제작\s*지원|협찬\s*받|제공\s*받|paid\s*partnership/i;
 const COMMERCE_SELL_RE = /공구|공동\s*구매|스마트\s*스토어|프로필\s*링크|구매\s*링크|와디즈|펀딩|마감\s*임박/;
 const commerceHintOf = (cap) => (COMMERCE_AD_RE.test(cap) ? '광고' : COMMERCE_SELL_RE.test(cap) ? '공구' : null);
@@ -308,6 +310,11 @@ async function scVideoUrl(url, key) {
 
 // ───────────────── 썸네일 ─────────────────
 // 인스타 CDN 주소는 만료되므로 반드시 받아둔다. 축소는 하지 않는다(도구 의존성 0).
+// ⚠️ 200 이 곧 그림은 아니다 — 인스타 CDN 은 로그인월·에러 페이지도 200 + text/html 로 준다.
+//    Content-Type 과 최소 바이트를 확인하지 않으면 HTML 이 .jpg 로 저장돼 카드에 깨진 그림이 박힌다.
+//    검사에 걸리면 파일을 아예 만들지 않고 null 을 돌려준다 → 호출부는 thumb=null 로 두고
+//    화면은 🎬 대체 아이콘으로 폴백한다(외부 임시 URL 을 대신 적어두지 않는다 — 곧 만료된다).
+const MIN_THUMB_BYTES = 1024;
 async function downloadThumb(srcUrl, name, force = false) {
   if (!srcUrl || !name) return null;
   const file = path.join(THUMBS, name);
@@ -318,7 +325,11 @@ async function downloadThumb(srcUrl, name, force = false) {
     fs.mkdirSync(THUMBS, { recursive: true });
     const res = await fetch(srcUrl, { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    const ctype = String(res.headers.get('content-type') || '').toLowerCase();
+    if (!ctype.startsWith('image/')) throw new Error(`이미지가 아님 (Content-Type: ${ctype || '없음'})`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < MIN_THUMB_BYTES) throw new Error(`너무 작음 (${buf.length}바이트)`);
+    fs.writeFileSync(file, buf);
     return `${THUMB_WEB}/${name}`;
   } catch (e) {
     log(`  ⚠️ 썸네일 실패 ${name}: ${String(e.message).slice(0, 60)}`);
@@ -331,10 +342,80 @@ const G = 'https://generativelanguage.googleapis.com';
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
 // 모델 응답에서 JSON 덩어리만 꺼낸다. 실패하면 원문 일부를 담아 돌려준다(파이프라인을 안 막는다).
+// ⚠️ 실패를 '조용히' 통과시키지는 않는다 — parseFailed 표시와 시각을 함께 남긴다.
+//    이게 없으면 호출부가 재시도할 근거도, 나중에 무엇을 다시 돌릴지 고를 근거도 사라진다.
 const extractJson = (text) => {
-  const m = String(text || '').match(/\{[\s\S]*\}/);
-  try { return JSON.parse(m ? m[0] : text); } catch { return { raw: String(text || '').slice(0, 500) }; }
+  const s = String(text || '');
+  const m = s.match(/\{[\s\S]*\}/);
+  try { return JSON.parse(m ? m[0] : s); }
+  catch { return { raw: s.slice(0, 500), parseFailed: true, parseFailedAt: new Date().toISOString() }; }
 };
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ── 생성 예산 ────────────────────────────────────────────────
+// maxOutputTokens 를 안 적으면 모델 기본값에 맡기게 되고, 응답이 잘려도(finishReason=MAX_TOKENS)
+// 잘린 줄 모른 채 'analyzed' 로 확정된다. 예산을 못 박고 finishReason 을 반드시 확인한다.
+const MAX_OUTPUT_TOKENS = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS) || 4096;
+// thinking(모델이 속으로 생각하는 과정)은 같은 출력 예산을 먹는다 — 예산을 따로 떼어주지 않으면
+// 생각하다가 본문이 잘린다. thinkingConfig 를 모르는 모델은 400 을 주므로, 그때 한 번만 빼고 다시 부르고
+// 이후 호출부터는 아예 붙이지 않는다(모델을 바꿔도 코드를 안 고쳐도 되게).
+const THINKING_BUDGET = Number(process.env.GEMINI_THINKING_BUDGET ?? 1024);
+let thinkingSupported = true;
+function genConfig() {
+  const cfg = { maxOutputTokens: MAX_OUTPUT_TOKENS };
+  if (thinkingSupported && Number.isFinite(THINKING_BUDGET) && THINKING_BUDGET >= 0) {
+    cfg.thinkingConfig = { thinkingBudget: THINKING_BUDGET };
+  }
+  return cfg;
+}
+
+// 응답 텍스트 꺼내기 — parts[0] 고정 인덱스로 읽으면 모델이 thought 파트를 앞에 얹은 날 빈 문자열을 받는다.
+// thought 파트는 건너뛰고 남은 text 를 전부 이어 붙인다.
+function candidateText(cand) {
+  const parts = cand?.content?.parts || [];
+  return parts.filter((p) => p && typeof p.text === 'string' && !p.thought).map((p) => p.text).join('').trim();
+}
+
+// 왜 끝났는지 — STOP 이 아니면 경고를 남긴다(특히 MAX_TOKENS 는 '잘린 답'이다)
+function checkFinish(cand, label) {
+  const fr = cand?.finishReason;
+  if (fr && fr !== 'STOP') {
+    log(`  ⚠️ Gemini ${label} finishReason=${fr}`
+      + (fr === 'MAX_TOKENS' ? ` — 응답이 잘렸을 수 있습니다 (GEMINI_MAX_OUTPUT_TOKENS 를 ${MAX_OUTPUT_TOKENS} 보다 크게)` : ''));
+  }
+  return fr || null;
+}
+
+// generateContent 한 번 — 빈 응답·HTTP 오류·thinking 미지원을 여기서 한 번에 처리한다.
+// 돌려주는 건 항상 '내용이 있는 텍스트'다(빈 문자열이면 예외).
+async function geminiCall(contents, gkey, { system = null, label = '', signal = null } = {}) {
+  for (let pass = 0; pass < 2; pass++) {
+    const body = { contents, generationConfig: genConfig() };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+    const r = await fetch(`${G}/v1beta/models/${MODEL}:generateContent?key=${gkey}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+      body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg = j.error?.message || `HTTP ${r.status}`;
+      if (pass === 0 && thinkingSupported && /thinking/i.test(msg)) {
+        thinkingSupported = false;
+        log(`  ⓘ 이 모델(${MODEL})은 thinkingConfig 를 받지 않아 출력 예산만 지정합니다`);
+        continue;
+      }
+      throw new Error(`Gemini ${label} ${msg}`.trim());
+    }
+    const cand = j.candidates?.[0];
+    const fr = checkFinish(cand, label);
+    const txt = candidateText(cand);
+    // 빈 응답을 그대로 넘기면 쓰레기 분석이 'analyzed' 로 영구 저장된다
+    if (!txt) throw new Error(`Gemini ${label} 빈 응답 (finishReason=${fr ?? '?'})`.trim());
+    return txt;
+  }
+  throw new Error(`Gemini ${label} 호출 실패`.trim());
+}
 
 async function downloadVideo(url, dest) {
   const ctrl = new AbortController();
@@ -380,16 +461,19 @@ async function geminiAnalyze(videoPath, gkey, prompt = VISUAL_PROMPT) {
     }
     // 아직 처리 중인 파일에 분석을 보내면 원인 모를 400 이 난다 → 60초에서 끊는다
     if (state !== 'ACTIVE') throw new Error(`Gemini 영상 처리 타임아웃 (state=${state}, 60초 초과)`);
-    // ③ 분석
-    const gen = await fetch(`${G}/v1beta/models/${MODEL}:generateContent?key=${gkey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ fileData: { mimeType: 'video/mp4', fileUri: file.uri } }, { text: prompt }] }] }),
-    });
-    const gj = await gen.json();
-    // HTTP 오류를 빈 응답으로 삼키면 쓰레기 분석이 'analyzed' 로 영구 저장된다
-    if (!gen.ok) throw new Error(`Gemini 분석 HTTP ${gen.status}: ${(gj.error?.message || '').slice(0, 80)}`);
-    return extractJson(gj.candidates?.[0]?.content?.parts?.[0]?.text || '');
+    // ③ 분석 — HTTP 오류·빈 응답·잘린 응답은 geminiCall 이 걸러낸다(빈 응답은 예외로 올라온다).
+    const ask = () => geminiCall(
+      [{ parts: [{ fileData: { mimeType: 'video/mp4', fileUri: file.uri } }, { text: prompt }] }],
+      gkey, { label: '시각분석' },
+    );
+    let out = extractJson(await ask());
+    // JSON 이 아니면 한 번만 다시 물어본다(모델이 산문으로 답하는 날이 있다).
+    // 그래도 안 되면 parseFailed 표시와 시각이 남아 나중에 다시 돌릴 대상을 고를 수 있다.
+    if (out.parseFailed) {
+      log('  ↻ 시각분석 응답이 JSON 이 아니라 1회 재시도');
+      out = extractJson(await ask());
+    }
+    return out;
   } finally {
     try { await fetch(`${G}/v1beta/${file.name}?key=${gkey}`, { method: 'DELETE' }); } catch { /* 48시간 뒤 자동 삭제되므로 실패해도 무방 */ }
   }
@@ -397,29 +481,33 @@ async function geminiAnalyze(videoPath, gkey, prompt = VISUAL_PROMPT) {
 
 // 텍스트 프롬프트 → Gemini. 기본은 JSON 으로 파싱해 돌려주고,
 // json:false 면 원문 그대로 돌려준다(채널 정체성처럼 줄글이 필요한 경우). 3회까지 재시도.
+// JSON 을 기대했는데 JSON 이 아닌 것도 '실패'로 보고 다시 물어본다 — 예전엔 {raw:...} 가 그대로
+// 통과해 쓰레기값이 'analyzed' 로 확정됐다. 끝내 실패하면 parseFailed·parseFailedAt 을 남긴다.
 async function geminiText(prompt, gkey, { json = true, system = null } = {}) {
-  let lastErr;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  const once = async () => {
     const ctrl = new AbortController();
     const to = setTimeout(() => ctrl.abort(), 90000);
+    try { return await geminiCall([{ parts: [{ text: prompt }] }], gkey, { system, label: '텍스트', signal: ctrl.signal }); }
+    finally { clearTimeout(to); }
+  };
+  let lastErr;
+  let lastFailed = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const body = { contents: [{ parts: [{ text: prompt }] }] };
-      if (system) body.systemInstruction = { parts: [{ text: system }] };
-      const r = await fetch(`${G}/v1beta/models/${MODEL}:generateContent?key=${gkey}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
-        body: JSON.stringify(body),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error?.message || `HTTP ${r.status}`);
-      const txt = j.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (!txt.trim()) throw new Error('빈 응답');
-      return json ? extractJson(txt) : txt.trim();
+      const txt = await once();
+      if (!json) return txt;
+      const out = extractJson(txt);
+      if (!out.parseFailed) return out;
+      lastFailed = out;
+      log(`  ↻ Gemini 응답이 JSON 이 아니라 다시 물어봅니다 (${attempt}/3)`);
     } catch (e) {
       lastErr = e;
-      await new Promise((r) => setTimeout(r, attempt * 2000)); // 429 폭탄 방지 백오프
-    } finally { clearTimeout(to); }
+    }
+    await sleep(attempt * 2000); // 429 폭탄 방지 백오프
   }
-  throw lastErr;
+  // 형식만 어긋난 응답은 표시를 남겨 돌려준다(파이프라인을 안 막는다). 통신 자체가 실패면 예외.
+  if (lastFailed) return lastFailed;
+  throw lastErr || new Error('Gemini 텍스트 호출 실패');
 }
 
 // ───────────────── 자주 쓰는 잡동사니 ─────────────────
@@ -475,5 +563,7 @@ module.exports = {
   normalizeProfile, normalizePost, normalizeGraphPost,
   commerceHintOf, cutSafe, avgViews, downloadThumb, pickThumb,
   VISUAL_PROMPT, extractJson, downloadVideo, geminiAnalyze, geminiText,
+  candidateText, MAX_OUTPUT_TOKENS,
+  COMMERCE_AD_RE, COMMERCE_SELL_RE,
   todayKST, pad3, median, limitOf,
 };

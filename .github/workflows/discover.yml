@@ -38,9 +38,16 @@ jobs:
 
       - name: 커밋·푸시
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
         run: |
-          git config user.name "dashboard-bot"
-          git config user.email "bot@users.noreply.github.com"
+          # ⚠️ 무료 Vercel(Hobby)은 GitHub 계정에 연결되지 않은 작성자의 커밋을 배포하지 않는다.
+          #    봇 이름으로 커밋하면 데이터는 쌓이는데 웹 주소가 옛 데이터에서 멈춘다 — daily.yml 의 설명 참조.
+          NOREPLY="$(gh api "users/$OWNER" --jq '"\(.id)+\(.login)@users.noreply.github.com"' 2>/dev/null || true)"
+          if [ -z "$NOREPLY" ]; then NOREPLY="$OWNER@users.noreply.github.com"; fi
+          git config user.name "$OWNER"
+          git config user.email "$NOREPLY"
           git add data/discoveries.json data/thumbs
           git diff --cached --quiet && echo "바뀐 게 없습니다" && exit 0
           git commit -m "자동: 레퍼런스 발굴 $(TZ=Asia/Seoul date +%F)"

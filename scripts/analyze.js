@@ -24,6 +24,12 @@ const {
 
 const ANALYZE_MAX = limitOf('ANALYZE_MAX', 10);
 const MAX_FAILS = 3; // 3회 실패한 릴스는 제외 — 매주 같은 항목에 크레딧을 다시 태우지 않는다
+
+// 이 파일의 프롬프트를 고칠 때마다 날짜를 올린다. 결과에 같이 적히므로,
+// 나중에 "옛 프롬프트로 만든 것만 다시 돌리자"를 고를 수 있다.
+// (소급 재분석 자체는 아직 구현하지 않았다 — 대상을 고를 근거만 남긴다.
+//  다시 돌리려면 해당 항목의 status 를 'collected' 로 되돌리면 이 스크립트가 다시 집는다)
+const PROMPT_VERSION = '2026-09-01';
 const TMP = path.join(os.tmpdir(), 'creator-dashboard-refs');
 
 // ── Gemini 종합 프롬프트 ─────────────────────────────────────────
@@ -135,6 +141,7 @@ async function main() {
       item.analysis = an;
       item.status = 'analyzed';
       item.analyzedAt = new Date().toISOString();
+      item.promptVersion = PROMPT_VERSION; // 어느 프롬프트로 만든 결과인지 (소급 재분석 대상 고르기용)
       delete item.analyzeFails;
       done++;
       log(`  ✅ ${item.cardNo} (${Math.round((item.views || 0) / 10000)}만) — ${an.주제 || ''}`);
