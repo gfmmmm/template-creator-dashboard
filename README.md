@@ -103,6 +103,10 @@ Claude Code가 [SETUP.md](SETUP.md)의 8단계를 하나씩 이끌어 줍니다.
 
 Claude에게 말로 시키면 됩니다. Claude는 [.claude/CLAUDE.md](.claude/CLAUDE.md)의 분류표대로 "바로 되는 것 / 크레딧이 드는 것 / 이 구조에선 안 되는 것(저장·로그인·실시간)"을 구분해 답합니다. 예시는 [docs/기능-레시피.md](docs/기능-레시피.md).
 
+## 허가창이 거의 안 뜨는 이유
+
+이 폴더의 `.claude/settings.json`이 세팅에 필요한 명령(node·git·gh·curl·vercel·python 등)과 이 폴더 안 파일 편집을 미리 허용해 둡니다. 이 폴더 안에서만 효력이 있고, 파일 삭제 같은 건 여전히 물어봅니다. 허가창이 뜨면 내용을 읽고 "Yes"를 누르면 됩니다.
+
 ## 함께 쓰는 도구
 
 - 릴스 대본 기획 — 이 대시보드의 데이터로 훅·대본·촬영 표: https://github.com/gfmmmm/template-reels-planner
