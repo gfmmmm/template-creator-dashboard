@@ -14,20 +14,20 @@
 
 1. 사용자에게 폴더를 어디에 둘지 묻는다(기본: 바탕화면의 `creator-dashboard`).
 2. ZIP을 받아 푼다: `curl -L -o cd.zip https://github.com/gfmmmm/template-creator-dashboard/archive/refs/heads/main.zip && unzip -q cd.zip && mv template-creator-dashboard-main <폴더> && rm cd.zip`
-3. 사용자에게 딱 두 줄 안내한다 — "폴더가 생겼어요. 터미널에서 `cd <폴더>` 를 치고 `claude` 를 다시 실행한 뒤, '구축 가이드대로 진행해줘'라고 말해주세요." (이 폴더의 규칙과 가이드는 그 폴더에서 열어야 읽힌다.)
+3. 사용자에게 딱 두 줄 안내한다 — "폴더가 생겼어요. VS Code에서 위 메뉴 파일 → 폴더 열기로 그 폴더를 연 다음, 왼쪽 Claude 패널에서 새 대화를 시작해 '구축 가이드대로 진행해줘'라고 말해주세요." (이 폴더의 규칙과 가이드는 그 폴더를 열어야 읽힌다. 터미널을 쓰는 사람이면 그 폴더에서 `claude`를 실행해도 같다.)
 4. 그 폴더에서 열린 Claude Code는 `SETUP.md`를 읽고 0단계부터 진행한다.
 
 ## 필요한 것
 
-- Claude Code (유료 플랜). 설치: https://docs.claude.com/ko/docs/claude-code/overview
+- VS Code(또는 Antigravity 같은 VS Code 계열) + Claude Code 확장, 로그인까지(유료 플랜). 설치: https://docs.claude.com/ko/docs/claude-code/overview
 - 공개 상태의 인스타그램 계정
 - 계정 4개 — 세팅 중에 Claude가 하나씩 만들게 안내합니다: GitHub(보관·자동화) · Vercel(웹 주소) · ScrapeCreators(수집) · Gemini(분석, 무료)
-- Mac 또는 Windows(Git Bash). Node 22 (없으면 Claude가 설치 안내)
+- Mac 또는 Windows(Windows는 Git for Windows가 있어야 함 — Claude Code 요구사항). Node 22는 없으면 Claude가 설치 안내
 
 ## 설치 — 세 줄
 
 1. 오른쪽 위 초록 `Code` → `Download ZIP` → 압축을 풀어 원하는 곳에 둡니다
-2. 그 폴더에서 터미널을 열고 `claude` 실행
+2. VS Code에서 파일 → 폴더 열기로 그 폴더를 열고, 왼쪽 Claude 패널을 켭니다
 3. 이렇게 말합니다: **"구축 가이드대로 진행해줘"**
 
 Claude Code가 [SETUP.md](SETUP.md)의 8단계를 하나씩 이끌어 줍니다. 넉넉히 50분. 컴퓨터 쪽 일은 Claude가 하고, 본인은 가입·클릭·붙여넣기만 합니다. 중간에 쉬어도 돼요 — "이어서 해줘".

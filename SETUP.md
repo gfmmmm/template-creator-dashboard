@@ -176,11 +176,11 @@ Gemini는 구글의 AI다. 릴스 영상을 보고 분석하고, 내 채널이 �
 
 > 여기 한 곳만 직접 쳐주셔야 해요. 딱 한 줄이고 나머지는 엔터만 누르시면 됩니다.
 >
-> 1. 터미널 창을 **새로** 여세요. Mac은 `Cmd+Space`를 누르고 "터미널"이라고 친 뒤 Enter. Windows는 시작 버튼을 누르고 "PowerShell"이라고 친 뒤 Enter.
+> 1. VS Code 위 메뉴에서 **터미널 → 새 터미널**을 누르세요. 화면 아래에 검은 입력창이 열려요. (VS Code가 아니면 — Mac은 `Cmd+Space`에 "터미널", Windows는 시작 버튼에 "PowerShell")
 > 2. 아래 한 줄을 그대로 붙여넣고 Enter: `gh auth login`
 > 3. 질문이 세 번쯤 나오는데 **전부 그냥 Enter**만 누르시면 돼요(GitHub.com → HTTPS → Login with a web browser 순서로 기본값이 이미 맞춰져 있어요).
 > 4. 화면에 **8자리 코드**(예: `ABCD-1234`)가 뜹니다. 그걸 복사하고 Enter를 누르면 브라우저가 열려요(안 열리면 https://github.com/login/device 를 직접 여세요). 코드를 붙여넣고 **Authorize**를 눌러주세요.
-> 5. 터미널에 "Logged in as ..."가 보이면 그 창은 닫으셔도 돼요. 여기에 '됐어요'라고 해주세요.
+> 5. 그 입력창에 "Logged in as ..."가 보이면 됐어요. 다시 Claude 패널로 와서 '됐어요'라고 해주세요.
 
 Claude가 확인한다: `gh auth status` → `Logged in`이 보이면 통과. 안 보이면 사용자에게 그 터미널 화면을 캡처해 달라고 부탁한다.
 
@@ -195,7 +195,7 @@ Claude가 확인한다: `gh auth status` → `Logged in`이 보이면 통과. �
 검증: `gh repo view <아이디>/creator-dashboard --json name`, `git status`가 clean, 원격에 `.env` 없음(`gh api repos/.../contents/.env`가 404). 진행 파일 repo.
 
 막힐 때:
-- `gh: command not found` → 터미널을 새로 안 열었거나 설치가 안 된 것. 새 터미널에서 다시. Windows는 0단계의 전체 경로(`"C:\Program Files\GitHub CLI\gh.exe"`)로 확인
+- `gh: command not found` → 방금 설치했는데 이미 열려 있던 터미널이라 새 경로를 모르는 것. 터미널 → 새 터미널로 다시 열어 재시도. Windows는 0단계의 전체 경로(`"C:\Program Files\GitHub CLI\gh.exe"`)로 확인
 - 브라우저가 안 열리거나 코드 입력 창이 안 뜨면 https://github.com/login/device 를 직접 열게 안내
 - "Repository name already exists" → 이름 뒤에 숫자를 붙여 다시(`creator-dashboard-2`)
 - push가 인증 오류면 `gh auth setup-git` 후 재시도
@@ -302,7 +302,7 @@ Claude가 한다(사용자는 할 일 없음):
 문장 1 (시작 — 폴더를 받기 전, 아무 데서나):
 `https://github.com/gfmmmm/template-creator-dashboard 에 있는 대시보드를 다운받아서 구축 가이드(SETUP.md)대로 끝까지 진행해줘. 나는 AI 초보자니까 쉽게 설명해줘.`
 
-문장 2 (Claude가 ZIP을 풀고 "그 폴더에서 `claude` 를 다시 열어주세요"라고 하면, 새 창에):
+문장 2 (Claude가 ZIP을 풀고 "그 폴더를 열어주세요"라고 하면, VS Code에서 파일 → 폴더 열기로 그 폴더를 열고 Claude 패널의 새 대화에):
 `구축 가이드대로 끝까지 진행해줘. 나는 AI 초보자니까 쉽게 설명해줘.`
 (앞 창의 대화는 새 창으로 넘어가지 않으므로 이 두 번째 문장이 반드시 필요하다)
 
